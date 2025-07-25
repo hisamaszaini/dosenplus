@@ -1,9 +1,0 @@
-import { useMemo } from 'react'
-import type { PelaksanaanKategori } from '../types/pelaksanaan-pendidikan.types'
-import { kategoriMap } from '../config/kategoriMap'
-
-export default function useKategoriKonfigurasi(kategori: PelaksanaanKategori) {
-  return useMemo(() => {
-    return kategoriMap[kategori]
-  }, [kategori])
-}

@@ -1,0 +1,251 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  // output   = "../generated/prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  DOSEN
+  VALIDATOR
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum NamaSemester {
+  GENAP
+  GANJIL
+}
+
+enum Jabatan {
+  LEKTOR
+}
+
+model User {
+  id                   Int        @id @default(autoincrement())
+  email                String     @unique
+  username             String     @unique
+  name                 String
+  password             String
+  role                 Role       @default(DOSEN)
+  status               UserStatus @default(ACTIVE)
+  hashedRefreshToken   String?
+  passwordResetToken   String?
+  passwordResetExpires DateTime?
+  createdAt            DateTime   @default(now())
+  updateAt             DateTime   @updatedAt
+  dosen                Dosen?
+  validator            Validator?
+}
+
+model Validator {
+  id            Int     @id
+  user          User    @relation(fields: [id], references: [id], onDelete: Cascade)
+  nama          String
+  nip           String? @unique
+  jenis_kelamin String
+  no_hp         String? @unique
+}
+
+model Fakultas {
+  id   Int    @id @default(autoincrement())
+  kode String @unique
+  nama String @unique
+
+  prodi Prodi[]
+  dosen Dosen[]
+
+  createdAt             DateTime                @default(now())
+  updateAt              DateTime                @updatedAt
+  PelaksanaanPendidikan PelaksanaanPendidikan[]
+}
+
+model Prodi {
+  id   Int    @id @default(autoincrement())
+  kode String @unique
+  nama String @unique
+
+  fakultasId Int
+  fakultas   Fakultas @relation(fields: [fakultasId], references: [id])
+
+  dosen Dosen[]
+
+  createdAt DateTime @default(now())
+  updateAt  DateTime @updatedAt
+
+  PelaksanaanPendidikan PelaksanaanPendidikan[]
+}
+
+model Semester {
+  id           Int          @id @default(autoincrement())
+  kode         Int
+  nama         String
+  tipe         NamaSemester
+  tahunMulai   Int
+  tahunSelesai Int
+  status       Boolean
+
+  createdAt             DateTime                @default(now())
+  updateAt              DateTime                @updatedAt
+  PelaksanaanPendidikan PelaksanaanPendidikan[]
+
+  @@index([tipe])
+  @@index([tahunMulai, tahunSelesai])
+}
+
+model Setting {
+  id         Int    @id @default(autoincrement())
+  name       String
+  nameRektor String
+}
+
+model Dosen {
+  id              Int              @id
+  user            User             @relation(fields: [id], references: [id], onDelete: Cascade)
+  nama            String
+  nip             String?          @unique
+  nuptk           String?          @unique
+  jenis_kelamin   String
+  no_hp           String?          @unique
+  prodiId         Int
+  prodi           Prodi            @relation(fields: [prodiId], references: [id])
+  fakultasId      Int
+  fakultas        Fakultas         @relation(fields: [fakultasId], references: [id])
+  jabatan         String?
+  dataKepegawaian DataKepegawaian?
+  createdAt       DateTime         @default(now())
+  updateAt        DateTime         @updatedAt
+  pendidikan      Pendidikan[]
+
+  PelaksanaanPendidikan PelaksanaanPendidikan[]
+}
+
+model DataKepegawaian {
+  id             Int     @id
+  npwp           String? @unique
+  nama_bank      String?
+  no_rek         String?
+  bpjs_kesehatan String?
+  bpjs_tkerja    String?
+  no_kk          String?
+  dosen          Dosen   @relation(fields: [id], references: [id], onDelete: Cascade)
+}
+
+enum Jenjang {
+  S1
+  S2
+  S3
+}
+
+model Pendidikan {
+  id      Int   @id @default(autoincrement())
+  dosenId Int
+  dosen   Dosen @relation(fields: [dosenId], references: [id])
+
+  kategori String
+  kegiatan String?
+  nilaiPak Int
+
+  // Untuk pendidikan formal
+  jenjang         String?
+  prodi           String?
+  fakultas        String?
+  perguruanTinggi String?
+  lulusTahun      Int?
+
+  jenisDiklat    String?
+  namaDiklat     String?
+  penyelenggara  String?
+  peran          String?
+  tingkatan      String?
+  jumlahJam      Int?
+  noSertifikat   String?
+  tglSertifikat  DateTime?
+  tempat         String?
+  tanggalMulai   DateTime?
+  tanggalSelesai DateTime?
+
+  file      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum KategoriKegiatan {
+  PERKULIAHAN
+  BIMBINGAN_SEMINAR
+  BIMBINGAN_TUGAS_AKHIR
+  BIMBINGAN_KKN
+  PENGUJI_UJIAN_AKHIR
+  PEMBINA_KEGIATAN_MHS
+  PENGEMBANGAN_PROGRAM
+  BAHAN_PENGAJARAN
+  ORASI_ILMIAH
+  JABATAN_STRUKTURAL
+  BIMBING_DOSEN
+  DATA_SERING
+  PENGEMBANGAN_DIRI
+}
+
+enum JenisKegiatan {
+  DOSEN_PEMBIMBING
+  DOSEN_PENGUJI
+  PEMBINA
+  PENULIS_BUKU
+  NARASUMBER
+  PENGEMBANGAN
+}
+
+enum JabatanFungsional {
+  ASISTEN_AHLI
+  LEKTOR
+  LEKTOR_KEPALA
+  GURU_BESAR
+}
+
+model PelaksanaanPendidikan {
+  id                Int                @id @default(autoincrement())
+  dosenId           Int
+  semesterId        Int
+  kategori          KategoriKegiatan
+  jenis             JenisKegiatan?
+  subJenis          String? // Disertasi, Tesis, dsb
+  jabatanFungsional JabatanFungsional? // Asisten Ahli, Lektor, dst
+  namaKegiatan      String?
+  jumlah            Int?
+  nilaiPak          Float              @default(0)
+  // totalPak          Float              @default(0)
+  deskripsi         String?
+
+  mataKuliah String?
+  sks        Int?
+  jumlahKelas     Int?
+  prodiId         Int?
+  fakultasId      Int?
+  perguruanTinggi String?
+
+  tglMulai   DateTime?
+  tglSelesai DateTime?
+
+  file String // URL ke file bukti PDF
+
+  dosen    Dosen     @relation(fields: [dosenId], references: [id])
+  semester Semester  @relation(fields: [semesterId], references: [id])
+  prodi    Prodi?    @relation(fields: [prodiId], references: [id])
+  fakultas Fakultas? @relation(fields: [fakultasId], references: [id])
+
+  createdAt DateTime @default(now())
+  updateAt  DateTime @updatedAt
+}
