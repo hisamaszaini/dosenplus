@@ -1,0 +1,130 @@
+import React, { useEffect, useState } from 'react';
+import type { PelaksanaanKategori } from '../../../types/pelaksanaan-pendidikan.types';
+import useKategoriKonfigurasi from '../../../hooks/useKategoriKonfigurasi';
+import { pelaksanaanPendidikanService } from '../../../services/pelaksanaan-pendidikan';
+import { kategoriMap } from '../../../config/kategoriMap';
+import ModalForm from './ModalForm';
+import ModalTambahData from './ModalTambahData';
+
+const PelaksanaanPendidikanTable = () => {
+    const [data, setData] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [kategori, setKategori] = useState<PelaksanaanKategori>('PERKULIAHAN');
+    const [selectedItem, setSelectedItem] = useState<any>(null);
+    const [isTambahModalOpen, setIsTambahModalOpen] = useState(false);
+    const konfigurasi = useKategoriKonfigurasi(kategori);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const result = await pelaksanaanPendidikanService.findAll();
+                if (result && Array.isArray(result.data)) {
+                    setData(result.data);
+                } else {
+                    console.error('Data is not an array:', result);
+                    setData([]);
+                }
+                setLoading(false);
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                setData([]);
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, []);
+
+    const handleOpenModal = (item: any) => {
+        setSelectedItem(item);
+    };
+
+    const handleCloseModal = () => {
+        setSelectedItem(null);
+    };
+
+    const handleOpenTambahModal = () => {
+        setIsTambahModalOpen(true);
+    };
+
+    const handleCloseTambahModal = () => {
+        setIsTambahModalOpen(false);
+    };
+
+    const handleSaveData = async (formValues: Record<string, any>) => {
+        try {
+            const formData = new FormData();
+
+            for (const key in formValues) {
+                const value = formValues[key];
+
+                if (value instanceof File) {
+                    formData.append(key, value);
+                } else {
+                    formData.append(key, value);
+                }
+            }
+
+            console.log('Isi FormData:', formValues.file);
+            const result = await pelaksanaanPendidikanService.create(formData);
+            setData([...data, result]);
+            setIsTambahModalOpen(false);
+        } catch (error) {
+            console.error('Error saving data:', error);
+        }
+    };
+
+
+
+    return (
+        <div>
+            <h2>{konfigurasi.label}</h2>
+            <select onChange={(e) => setKategori(e.target.value as PelaksanaanKategori)}>
+                {Object.keys(kategoriMap).map((kategori) => (
+                    <option key={kategori} value={kategori}>
+                        {kategoriMap[kategori].label}
+                    </option>
+                ))}
+            </select>
+            <button onClick={handleOpenTambahModal}>Tambah Data</button>
+            {loading ? (
+                <p>Loading...</p>
+            ) : (
+                <table>
+                    <thead>
+                        <tr>
+                            {konfigurasi.columns.map((column) => (
+                                <th key={column}>{column}</th>
+                            ))}
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {data
+                            .filter((item) => item.kategori === kategori)
+                            .map((item, index) => (
+                                <tr key={index}>
+                                    {konfigurasi.columns.map((column) => (
+                                        <td key={column}>{item[column]}</td>
+                                    ))}
+                                    <td>
+                                        <button onClick={() => handleOpenModal(item)}>Edit</button>
+                                    </td>
+                                </tr>
+                            ))}
+                    </tbody>
+                </table>
+            )}
+            {selectedItem && <ModalForm item={selectedItem} onClose={handleCloseModal} />}
+            {isTambahModalOpen && (
+                <ModalTambahData
+                    kategori={kategori}
+                    onClose={handleCloseTambahModal}
+                    onSave={handleSaveData}
+                />
+            )}
+        </div>
+    );
+};
+
+export default PelaksanaanPendidikanTable;

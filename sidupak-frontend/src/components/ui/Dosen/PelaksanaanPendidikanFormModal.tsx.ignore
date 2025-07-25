@@ -1,0 +1,158 @@
+import React, { useEffect } from 'react'
+import { useForm } from 'react-hook-form'
+import useKategoriKonfigurasi from '../../../hooks/useKategoriKonfigurasi'
+import type { PelaksanaanKategori } from '../../../types/pelaksanaan-pendidikan.types'
+
+export type FormFieldType =
+  | 'text'
+  | 'number'
+  | 'select'
+  | 'textarea'
+  | 'date'
+  | 'file'
+  | 'enum'
+
+export interface FormFieldOption {
+  label: string
+  value: string | number
+}
+
+export interface FormField {
+  name: string
+  type: FormFieldType
+  label?: string
+  required?: boolean
+  options?: FormFieldOption[]
+}
+
+export interface KategoriConfig {
+  label: string
+  formFields: FormField[]
+}
+
+interface Props {
+  isOpen: boolean
+  onClose: () => void
+  onSubmit: (formData: FormData) => void
+  initialData?: any
+}
+
+export default function PelaksanaanPendidikanFormModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  initialData,
+}: Props) {
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    setValue,
+    formState: { errors },
+  } = useForm({
+    defaultValues: initialData || {
+      kategori: '' as PelaksanaanKategori,
+      file: null,
+    },
+  })
+
+  const kategori = watch('kategori')
+  const config = useKategoriKonfigurasi(kategori)
+
+  useEffect(() => {
+    if (initialData) reset(initialData)
+  }, [initialData, reset])
+
+  const submitHandler = async (data: any) => {
+    const formData = new FormData()
+    for (const key in data) {
+      if (data[key] instanceof File) {
+        formData.append(key, data[key])
+      } else {
+        formData.append(key, String(data[key]))
+      }
+    }
+
+    try {
+      await onSubmit(formData)
+      reset()
+      onClose()
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center">
+      <div className="bg-white w-full max-w-2xl rounded-lg shadow-lg p-6 relative">
+        <h2 className="text-xl font-bold mb-4">
+          {initialData ? 'Edit' : 'Tambah'} Pelaksanaan Pendidikan
+        </h2>
+
+        <form onSubmit={handleSubmit(submitHandler)} className="space-y-4">
+          {!initialData && (
+            <div>
+              <label className="font-semibold">Kategori</label>
+              <select {...register('kategori', { required: true })} className="input">
+                <option value="">Pilih Kategori</option>
+                {config?.formFields?.map((field, index) => (
+                  <option key={field.name || `field-${index}`} value={field.name || `field-${index}`}>
+                    {field.label || field.name || `Field ${index}`}
+                  </option>
+                ))}
+              </select>
+              {errors.kategori && <p className="text-red-500 text-sm">Kategori wajib dipilih</p>}
+            </div>
+          )}
+
+          {config?.formFields?.map((field, index) => (
+            <div key={field.name || `field-${index}`}>
+              <label className="font-semibold capitalize">{field.label || field.name || `Field ${index}`}</label>
+              {field.type === 'file' ? (
+                <input
+                  type="file"
+                  accept=".pdf"
+                  {...register(field.name || `field-${index}`, { required: field.required })}
+                  className="input"
+                />
+              ) : field.type === 'select' || field.type === 'enum' ? (
+                <select
+                  {...register(field.name || `field-${index}`, { required: field.required })}
+                  className="input"
+                >
+                  <option value="">Pilih</option>
+                  {field.options?.map((opt, optIndex) => (
+                    <option key={opt.value || `opt-${optIndex}`} value={opt.value || `opt-${optIndex}`}>
+                      {opt.label || `Option ${optIndex}`}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type={field.type}
+                  {...register(field.name || `field-${index}`, { required: field.required })}
+                  className="input"
+                />
+              )}
+              {errors[field.name || `field-${index}`] && (
+                <p className="text-red-500 text-sm">Kolom ini wajib diisi</p>
+              )}
+            </div>
+          ))}
+
+          <div className="flex justify-end space-x-2">
+            <button type="button" onClick={onClose} className="btn-secondary">
+              Batal
+            </button>
+            <button type="submit" className="btn-primary">
+              Simpan
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}

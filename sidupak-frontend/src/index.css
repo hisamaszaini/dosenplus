@@ -1,0 +1,21 @@
+@import "tailwindcss";
+@tailwind utilities;
+
+@theme {
+  --color-primary: #00A6F4;
+  --color-primary-dark: #0084D1;
+  --color-primary-light: #00BCFF;
+}
+
+.sidebar-primary-gradient {
+  background: linear-gradient(180deg, #4E73DF 0%, #224ABE 100%);
+}
+
+.sidebar-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.3);
+  border-radius: 10px;
+}

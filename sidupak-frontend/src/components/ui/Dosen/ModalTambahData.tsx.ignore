@@ -1,0 +1,131 @@
+// ModalTambahData.tsx
+import React, { useEffect, useState } from 'react';
+import type { FormFieldConfig, FormFieldOption, PelaksanaanKategori } from '../../../types/pelaksanaan-pendidikan.types';
+import useKategoriKonfigurasi from '../../../hooks/useKategoriKonfigurasi';
+import { getAllSemesters } from '../../../services/semester.service';
+import { getAllFakultas } from '../../../services/fakultas.service';
+import { getAllProdi } from '../../../services/prodi.service';
+import type { Semester } from '../../../types/semester.types';
+import type { Fakultas } from '../../../../../sidupak-backend/src/fakultas/dto/fakultas.dto';
+import type { Prodi } from '../../../../../sidupak-backend/src/prodi/dto/prodi.dto';
+
+interface ModalTambahDataProps {
+    kategori: PelaksanaanKategori;
+    onClose: () => void;
+    onSave: (formData: any) => void;
+}
+
+const ModalTambahData = ({ kategori, onClose, onSave }: ModalTambahDataProps) => {
+    const konfigurasi = useKategoriKonfigurasi(kategori);
+    const [formData, setFormData] = useState({ kategori });
+    const [semesters, setSemesters] = useState<FormFieldOption[]>([]);
+    const [fakultas, setFakultas] = useState<FormFieldOption[]>([]);
+    const [prodi, setProdi] = useState<FormFieldOption[]>([]);
+
+    useEffect(() => {
+        const fetchSemesters = async () => {
+            const data = await getAllSemesters();
+            setSemesters([
+                { label: '--Pilih Semester--', value: '' },
+                ...data.data.map((semester: Semester) => ({ label: semester.tipe, value: semester.id })),
+            ]);
+        };
+
+        const fetchFakultas = async () => {
+            const data = await getAllFakultas();
+            setFakultas([
+                { label: '--Pilih Fakultas--', value: '' },
+                ...data.map((fakultas: Fakultas) => ({ label: fakultas.nama, value: fakultas.id })),
+            ]);
+        };
+
+        const fetchProdi = async () => {
+            const data = await getAllProdi();
+            setProdi([
+                { label: '--Pilih Prodi--', value: '' },
+                ...data.map((prodi: Prodi) => ({ label: prodi.nama, value: prodi.id })),
+            ]);
+        };
+
+        fetchSemesters();
+        fetchFakultas();
+        fetchProdi();
+    }, []);
+
+    const handleChange = (
+        e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+    ) => {
+        const { name, type, files, value } = e.target as HTMLInputElement;
+
+        if (type === 'file') {
+            setFormData((prev) => ({ ...prev, [name]: files && files.length > 0 ? files[0] : null }));
+        } else {
+            setFormData((prev) => ({ ...prev, [name]: value }));
+        }
+    };
+
+
+    const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        onSave(formData);
+        onClose();
+    };
+
+    const renderInput = (field: FormFieldConfig) => {
+        switch (field.type) {
+            case 'text':
+                return <input type="text" name={field.name} onChange={handleChange} />;
+            case 'number':
+                return <input type="number" name={field.name} onChange={handleChange} />;
+            case 'select':
+                const options = field.name === 'semesterId' ? semesters : field.name === 'fakultasId' ? fakultas : prodi;
+                return (
+                    <select name={field.name} onChange={handleChange}>
+                        {options.map((option) => (
+                            <option key={option.value} value={option.value}>
+                                {option.label}
+                            </option>
+                        ))}
+                    </select>
+                );
+            case 'textarea':
+                return <textarea name={field.name} onChange={handleChange} />;
+            case 'date':
+                return <input type="date" name={field.name} onChange={handleChange} />;
+            case 'file':
+                return <input type="file" name={field.name} onChange={handleChange} />;
+            case 'enum':
+                return (
+                    <select name={field.name} onChange={handleChange}>
+                        {field.options?.map((option) => (
+                            <option key={option.value} value={option.value}>
+                                {option.label}
+                            </option>
+                        ))}
+                    </select>
+                );
+            default:
+                return <input type="text" name={field.name} onChange={handleChange} />;
+        }
+    };
+
+    return (
+        <div className="modal">
+            <div className="modal-content">
+                <h2>Tambah {konfigurasi.label}</h2>
+                <form onSubmit={handleSubmit}>
+                    {konfigurasi.formFields.map((field) => (
+                        <div key={field.name}>
+                            <label>{field.label}</label>
+                            {renderInput(field)}
+                        </div>
+                    ))}
+                    <button type="submit">Save</button>
+                    <button type="button" onClick={onClose}>Cancel</button>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+export default ModalTambahData;

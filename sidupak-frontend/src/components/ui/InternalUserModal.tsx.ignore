@@ -1,0 +1,203 @@
+import { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { toast } from 'sonner';
+
+import {
+    type CreateInternalUserDto,
+} from '../../../../sidupak-backend/src/users/dto/user.dto';
+import * as userService from '../../services/user.service';
+
+import FormField from './FormField';
+import Button from './Button';
+
+interface InternalUserModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onSuccess: () => void;
+    userId?: number | null;
+}
+
+const internalUserFormSchema = z.object({
+    name: z.string().min(3, { message: 'Nama lengkap minimal 3 karakter' }),
+    username: z.string().min(3, { message: 'Username minimal 3 karakter' }),
+    email: z.string().email({ message: 'Format email tidak valid' }),
+    role: z.enum(['ADMIN', 'VALIDATOR']),
+    status: z.enum(['ACTIVE', 'INACTIVE']).optional(),
+    password: z.string().min(8, "Password minimal 8 karakter").optional().or(z.literal('')),
+    confirmPassword: z.string().optional().or(z.literal('')),
+    nip: z.string().optional(),
+    no_hp: z.string().optional(),
+    jenis_kelamin: z.string().optional(),
+}).refine((data) => {
+    if (data.password) {
+        return data.password === data.confirmPassword;
+    }
+    return true;
+}, {
+    message: 'Password dan konfirmasi password tidak cocok',
+    path: ['confirmPassword'],
+});
+
+type InternalFormData = z.infer<typeof internalUserFormSchema>;
+
+export const InternalUserModal = ({ isOpen, onClose, onSuccess, userId }: InternalUserModalProps) => {
+    const [apiError, setApiError] = useState<string | null>(null);
+
+    const {
+        register,
+        handleSubmit,
+        reset,
+        watch,
+        formState: { errors, isSubmitting },
+    } = useForm<InternalFormData>({
+        resolver: zodResolver(internalUserFormSchema),
+    });
+
+    const isEditMode = !!userId;
+    const watchedRole = watch('role');
+
+    useEffect(() => {
+        const fetchAndSetUserData = async () => {
+            if (isEditMode && userId) {
+                try {
+                    const userData = await userService.getUserById(userId);
+                    reset({
+                        name: userData.name,
+                        username: userData.username,
+                        email: userData.email,
+                        role: userData.role,
+                        status: userData.status,
+                        nip: userData.validator?.nip ?? '',
+                        no_hp: userData.validator?.no_hp ?? '',
+                        jenis_kelamin: userData.validator?.jenis_kelamin ?? 'Laki-laki',
+                    });
+                } catch (error) {
+                    toast.error("Gagal memuat data pengguna.");
+                    onClose();
+                }
+            } else {
+                // Reset untuk mode tambah
+                reset({
+                    name: '', username: '', email: '', password: '', confirmPassword: '',
+                    role: 'VALIDATOR', nip: '', no_hp: '', jenis_kelamin: 'Laki-laki',
+                });
+            }
+        };
+
+        if (isOpen) {
+            setApiError(null);
+            fetchAndSetUserData();
+        }
+    }, [isOpen, userId, reset, onClose]);
+
+    const onSubmit = async (data: InternalFormData) => {
+        setApiError(null);
+        
+        const payload: Partial<CreateInternalUserDto> = {
+            name: data.name, username: data.username, email: data.email, role: data.role,
+        };
+
+        if (data.password) {
+            payload.password = data.password;
+        }
+
+        if (data.role === 'VALIDATOR') {
+            payload.validatorBiodata = {
+                nama: data.name, nip: data.nip, no_hp: data.no_hp, jenis_kelamin: data.jenis_kelamin,
+            };
+        }
+
+        try {
+            if (isEditMode && userId) {
+                await userService.updateInternalUserProfile(userId, payload);
+                if (data.status) {
+                    await userService.updateUserStatus(userId, { status: data.status });
+                }
+            } else {
+                await userService.createInternalUser(payload as CreateInternalUserDto);
+            }
+            toast.success(isEditMode ? 'Pengguna berhasil diperbarui!' : 'Pengguna baru berhasil ditambahkan!');
+            onSuccess();
+        } catch (err: any) {
+            const errorMessage = err.response?.data?.message || 'Terjadi kesalahan.';
+            setApiError(Array.isArray(errorMessage) ? errorMessage.join(', ') : errorMessage);
+            toast.error(Array.isArray(errorMessage) ? errorMessage.join(', ') : errorMessage);
+        }
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black/50 z-50 flex justify-center items-center p-4 animate-fade-in">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+                <div className="py-5 px-6 border-b border-gray-200">
+                    <h3 className="text-xl font-semibold text-gray-700">
+                        {isEditMode ? 'Edit User Internal' : 'Tambah User Internal'}
+                    </h3>
+                </div>
+                <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4 overflow-y-auto">
+                    {/* Field umum Anda yang tidak diubah */}
+                    <FormField label="Nama Lengkap" error={errors.name?.message}>
+                        <input {...register('name')} className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-indigo-500 outline-none" />
+                    </FormField>
+                    <FormField label="Username" error={errors.username?.message}>
+                        <input {...register('username')} className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-indigo-500 outline-none" />
+                    </FormField>
+                    <FormField label="Email" error={errors.email?.message}>
+                        <input type="email" {...register('email')} className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-indigo-500 outline-none" />
+                    </FormField>
+                    <FormField label="Password" helpText={isEditMode ? "Kosongkan jika tidak diubah" : ""} error={errors.password?.message}>
+                        <input type="password" {...register('password')} className="w-full px-4 py-3 rounded-xl border border-gray-300" />
+                    </FormField>
+                    <FormField label="Konfirmasi Password" error={errors.confirmPassword?.message}>
+                        <input type="password" {...register('confirmPassword')} className="w-full px-4 py-3 rounded-xl border border-gray-300" />
+                    </FormField>
+
+                    <FormField label="Role" error={errors.role?.message}>
+                        <select {...register('role')} className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white">
+                            <option value="VALIDATOR">Validator</option>
+                            <option value="ADMIN">Admin</option>
+                        </select>
+                    </FormField>
+
+                    {watchedRole === 'VALIDATOR' && (
+                        <div className="p-4 border-t border-b border-gray-200 space-y-4">
+                            <FormField label="NIP (Opsional)" error={errors.nip?.message}>
+                                <input {...register('nip')} className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-indigo-500 outline-none" />
+                            </FormField>
+                            <FormField label="No. HP (Opsional)" error={errors.no_hp?.message}>
+                                <input {...register('no_hp')} className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-indigo-500 outline-none" />
+                            </FormField>
+                            <FormField label="Jenis Kelamin" error={errors.jenis_kelamin?.message}>
+                                <select {...register('jenis_kelamin')} className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white">
+                                    <option value="Laki-laki">Laki-laki</option>
+                                    <option value="Perempuan">Perempuan</option>
+                                </select>
+                            </FormField>
+                        </div>
+                    )}
+
+                    {isEditMode && (
+                        <FormField label="Status" error={errors.status?.message}>
+                            <select {...register('status')} className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white">
+                                <option value="ACTIVE">Aktif</option>
+                                <option value="INACTIVE">Tidak Aktif</option>
+                            </select>
+                        </FormField>
+                    )}
+
+                    {apiError && <p className="text-red-600 text-sm text-center pt-2">{apiError}</p>}
+
+                    <div className="pt-6 flex justify-end gap-3">
+                        <Button type="button" variant="secondary" onClick={onClose} disabled={isSubmitting}>Batal</Button>
+                        <Button type="submit" variant="primary" size="normal" icon="fas fa-save" disabled={isSubmitting}>
+                            {isSubmitting ? 'Menyimpan...' : 'Simpan'}
+                        </Button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};

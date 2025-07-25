@@ -1,0 +1,43 @@
+// ModalForm.tsx
+import React, { useState, useEffect } from 'react';
+import useKategoriKonfigurasi from '../../../hooks/useKategoriKonfigurasi';
+import type { PelaksanaanKategori } from '../../../types/pelaksanaan-pendidikan.types';
+
+interface ModalFormProps {
+  item: any;
+}
+
+const ModalForm = ({ item }: ModalFormProps) => {
+  const [kategori, setKategori] = useState<PelaksanaanKategori>(item.kategori);
+  const konfigurasi = useKategoriKonfigurasi(kategori);
+
+  useEffect(() => {
+    setKategori(item.kategori);
+  }, [item]);
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    console.log('Form submitted:', item);
+    // Handle form submission logic here
+  };
+
+  return (
+    <div className="modal">
+      <div className="modal-content">
+        <h2>Edit {konfigurasi.label}</h2>
+        <form onSubmit={handleSubmit}>
+          {konfigurasi.formFields.map((field) => (
+            <div key={field}>
+              <label>{field}</label>
+              <input type="text" name={field} defaultValue={item[field]} />
+            </div>
+          ))}
+          <button type="submit">Save</button>
+          <button type="button" onClick={() => setKategori(null)}>Cancel</button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default ModalForm;

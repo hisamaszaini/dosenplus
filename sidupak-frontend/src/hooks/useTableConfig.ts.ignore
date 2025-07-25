@@ -1,0 +1,97 @@
+import { useMemo } from 'react';
+
+interface TableConfig {
+  id: string;
+  title: string;
+  icon: string;
+  category?: string;
+  initialFilters: {
+    sortBy: string;
+    sortOrder: 'asc' | 'desc';
+  };
+}
+
+interface UseTableConfigProps {
+  baseService: any; // Service yang akan digunakan
+  userId: string;
+  userRole: string;
+}
+
+export const useTableConfig = ({ baseService, userId, userRole }: UseTableConfigProps) => {
+  // Factory function untuk membuat fetch function yang spesifik
+  const createFetchFunction = useMemo(() => {
+    return (kategoriFilter?: string, additionalFilters?: Record<string, any>) => {
+      return async (params: any) => {
+        const finalParams = {
+          ...params,
+          ...(kategoriFilter && { kategori: kategoriFilter }),
+          ...additionalFilters
+        };
+        
+        return await baseService.findAll(finalParams, userId, userRole);
+      };
+    };
+  }, [baseService, userId, userRole]);
+
+  // Predefined table configurations
+  const pendidikanConfigs: TableConfig[] = useMemo(() => [
+    {
+      id: 'pendidikan-formal',
+      title: 'Pendidikan Formal',
+      icon: 'fa-university',
+      category: 'Pendidikan Formal',
+      initialFilters: {
+        sortBy: 'lulusTahun',
+        sortOrder: 'desc'
+      }
+    },
+    {
+      id: 'diklat',
+      title: 'Diklat',
+      icon: 'fa-cogs',
+      category: 'Diklat',
+      initialFilters: {
+        sortBy: 'createdAt',
+        sortOrder: 'desc'
+      }
+    },
+    {
+      id: 'all-data',
+      title: 'Semua Data Pendidikan',
+      icon: 'fa-list',
+      initialFilters: {
+        sortBy: 'createdAt',
+        sortOrder: 'desc'
+      }
+    }
+  ], []);
+
+  // Generate table configurations with fetch functions
+  const tableConfigurations = useMemo(() => {
+    return pendidikanConfigs.map(config => ({
+      ...config,
+      fetchData: createFetchFunction(config.category)
+    }));
+  }, [pendidikanConfigs, createFetchFunction]);
+
+  // Custom configuration builder
+  const buildCustomConfig = (configs: Partial<TableConfig>[]) => {
+    return configs.map(config => ({
+      id: config.id || 'custom-table',
+      title: config.title || 'Custom Table',
+      icon: config.icon || 'fa-table',
+      initialFilters: config.initialFilters || {
+        sortBy: 'createdAt',
+        sortOrder: 'desc' as 'desc'
+      },
+      fetchData: createFetchFunction(config.category)
+    }));
+  };
+
+  return {
+    tableConfigurations,
+    createFetchFunction,
+    buildCustomConfig,
+    predefinedConfigs: pendidikanConfigs
+  };
+};

@@ -1,0 +1,190 @@
+import React, { useEffect, useMemo, useState } from 'react'
+import {
+    flexRender,
+    getCoreRowModel,
+    getSortedRowModel,
+    useReactTable,
+    type ColumnDef,
+    type SortingState,
+} from '@tanstack/react-table'
+import { toast } from 'sonner'
+import type { PelaksanaanKategori } from '../../../types/pelaksanaan-pendidikan.types'
+import { pelaksanaanPendidikanService } from '../../../services/pelaksanaan-pendidikan'
+import { kategoriMap } from '../../../config/kategoriMap'
+import PelaksanaanPendidikanFormModal from './PelaksanaanPendidikanFormModal'
+
+interface Props {
+    kategori: PelaksanaanKategori
+}
+
+export default function PelaksanaanTable({ kategori }: Props) {
+    const [data, setData] = useState<any[]>([])
+    const [sorting, setSorting] = useState<SortingState>([])
+    const [search, setSearch] = useState('')
+    const [page, setPage] = useState(1)
+    const [limit] = useState(10)
+    const [meta, setMeta] = useState({ page: 1, totalPages: 1 })
+    const [showModal, setShowModal] = useState(false)
+    const [editData, setEditData] = useState<any | null>(null)
+
+    const fetchData = async () => {
+        try {
+            const res = await pelaksanaanPendidikanService.findAll({
+                page,
+                limit,
+                kategori,
+                search,
+                sortBy: sorting[0]?.id,
+                sortOrder: sorting[0]?.desc ? 'desc' : 'asc',
+            })
+            setData(res.data)
+            setMeta(res.meta)
+        } catch (err) {
+            toast.error('Gagal memuat data')
+            console.error(err)
+        }
+    }
+
+    useEffect(() => {
+        const timer = setTimeout(fetchData, 500)
+        return () => clearTimeout(timer)
+    }, [page, search, sorting, kategori])
+
+    const totalPak = useMemo(() => {
+        return data.reduce((sum, d) => sum + (d.nilaiPak || 0), 0)
+    }, [data])
+
+    const handleEdit = (row: any) => {
+        toast.info('Edit belum diimplementasi')
+    }
+
+    const handleDelete = (id: number) => {
+        toast.info('Delete belum diimplementasi')
+    }
+
+    const columns = useMemo<ColumnDef<any>[]>(() => {
+        const dynamicKeys = kategoriMap[kategori].columns
+
+        return [
+            {
+                header: 'No',
+                cell: info => (page - 1) * limit + info.row.index + 1,
+            },
+            ...dynamicKeys.map(key => ({
+                accessorKey: key,
+                header: key,
+                cell: info => info.getValue() || '-',
+            })),
+            {
+                header: 'Aksi',
+                id: 'actions',
+                cell: info => (
+                    <div className="flex gap-2">
+                        <button onClick={() => handleEdit(info.row.original)} className="text-blue-500 hover:underline">Edit</button>
+                        <button onClick={() => handleDelete(info.row.original.id)} className="text-red-500 hover:underline">Hapus</button>
+                    </div>
+                ),
+            },
+        ]
+    }, [kategori, page, limit])
+
+    const table = useReactTable({
+        data,
+        columns,
+        state: { sorting },
+        onSortingChange: setSorting,
+        getCoreRowModel: getCoreRowModel(),
+        getSortedRowModel: getSortedRowModel(),
+        manualPagination: true,
+        manualSorting: true,
+        pageCount: meta.totalPages,
+    })
+
+    return (
+        <div className="bg-white rounded-xl shadow-md p-4">
+            <div className="mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                <h2 className="text-lg font-bold">{kategoriMap[kategori].label}</h2>
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                    <input
+                        type="text"
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        placeholder="Cari..."
+                        className="border border-gray-300 px-3 py-1 rounded w-full sm:w-64"
+                    />
+                    <button
+                        onClick={() => {
+                            setEditData(null)
+                            setShowModal(true)
+                        }}
+                        className="bg-blue-500 text-white px-4 py-1.5 rounded hover:bg-blue-600 transition"
+                    >
+                        <i className="fas fa-plus mr-1"></i> Tambah
+                    </button>
+                </div>
+            </div>
+
+            <table className="w-full text-left border border-gray-200">
+                <thead className="bg-gray-50">
+                    {table.getHeaderGroups().map(hg => (
+                        <tr key={hg.id}>
+                            {hg.headers.map(header => (
+                                <th key={header.id} className="p-2 border-b">
+                                    {flexRender(header.column.columnDef.header, header.getContext())}
+                                </th>
+                            ))}
+                        </tr>
+                    ))}
+                </thead>
+                <tbody>
+                    {table.getRowModel().rows.map(row => (
+                        <tr key={row.id} className="hover:bg-gray-50">
+                            {row.getVisibleCells().map(cell => (
+                                <td key={cell.id} className="p-2 border-b">
+                                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                </td>
+                            ))}
+                        </tr>
+                    ))}
+                    {data.length === 0 && (
+                        <tr>
+                            <td colSpan={columns.length} className="text-center p-4 text-gray-500">Tidak ada data</td>
+                        </tr>
+                    )}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colSpan={columns.length - 1} className="text-right font-semibold p-2">Total PAK</td>
+                        <td className="p-2 font-bold text-indigo-600">{totalPak}</td>
+                    </tr>
+                </tfoot>
+            </table>
+
+            <div className="flex justify-between items-center mt-4">
+                <span className="text-sm text-gray-600">Halaman {meta.page} dari {meta.totalPages}</span>
+                <div className="flex gap-2">
+                    <button onClick={() => setPage(p => Math.max(p - 1, 1))} disabled={page === 1} className="px-3 py-1 bg-gray-200 rounded">Prev</button>
+                    <button onClick={() => setPage(p => Math.min(p + 1, meta.totalPages))} disabled={page === meta.totalPages} className="px-3 py-1 bg-gray-200 rounded">Next</button>
+                </div>
+            </div>
+            {showModal && (
+                <PelaksanaanPendidikanFormModal
+                    isOpen={showModal}
+                    onClose={() => setShowModal(false)}
+                    initialData={{ kategori }}
+                    onSubmit={async (formData) => {
+                        try {
+                            await pelaksanaanPendidikanService.create(formData)
+                            toast.success('Data berhasil ditambahkan')
+                            setShowModal(false)
+                            fetchData()
+                        } catch (err) {
+                            toast.error('Gagal menambah data')
+                            console.error(err)
+                        }
+                    }}
+                />
+            )}
+        </div>
+    )
+}
