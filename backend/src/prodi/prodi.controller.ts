@@ -4,7 +4,7 @@ import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { ProdiService } from './prodi.service';
 import { Roles } from 'src/auth/decorators/roles.decorator';
 import { CreateProdiDto, UpdateProdiDto } from './dto/prodi.dto';
-import { Role } from '@prisma/client';
+import { TypeUserRole } from '@prisma/client';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('prodi')
@@ -13,32 +13,32 @@ export class ProdiController {
     }
 
     @Post()
-    @Roles(Role.ADMIN)
+    @Roles(TypeUserRole.ADMIN)
     create(@Body() createProdiDto: CreateProdiDto) {
         return this.prodiService.create(createProdiDto);
     }
 
     @Get()
-    @Roles(Role.ADMIN, Role.DOSEN, Role.VALIDATOR)
+    @Roles(TypeUserRole.ADMIN, TypeUserRole.DOSEN, TypeUserRole.VALIDATOR)
     findAll() {
         return this.prodiService.findAll();
     }
 
     @Get(':id')
-    @Roles(Role.ADMIN, Role.DOSEN, Role.VALIDATOR)
+    @Roles(TypeUserRole.ADMIN, TypeUserRole.DOSEN, TypeUserRole.VALIDATOR)
     findOne(@Param('id', ParseIntPipe) id: number) {
         return this.prodiService.findOne(id);
     }
 
 
     @Patch(':id')
-    @Roles(Role.ADMIN)
+    @Roles(TypeUserRole.ADMIN)
     update(@Param('id', ParseIntPipe) id: number, @Body() updateProdiDto: UpdateProdiDto) {
         return this.prodiService.update(id, updateProdiDto);
     }
 
     @Delete(':id')
-    @Roles(Role.ADMIN)
+    @Roles(TypeUserRole.ADMIN)
     @HttpCode(HttpStatus.NO_CONTENT)
     remove(@Param('id', ParseIntPipe) id: number) {
         return this.prodiService.remove(id);

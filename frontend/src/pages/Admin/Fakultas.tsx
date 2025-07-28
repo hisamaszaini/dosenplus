@@ -1,32 +1,38 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 
 import * as fakultasService from '../../services/fakultas.service';
-import { type Fakultas } from '../../../../sidupak-backend/src/fakultas/dto/fakultas.dto';
+import type { Fakultas } from '../../../../backend/src/fakultas/dto/fakultas.dto';
 import Button from '../../components/ui/Button';
 import FakultasFormModal from '../../components/ui/FakultasFormModal';
+import PageWrapper from '../../components/PageWrapper';
 
 const AdminFakultasPage = () => {
   const [fakultas, setFakultas] = useState<Fakultas[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [editingFakultas, setEditingFakultas] = useState<Fakultas | null>(null);
 
-  const fetchFakultas = async () => {
+  const fetchFakultas = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await fakultasService.getAllFakultas();
-      setFakultas(data); 
+      const response = await fakultasService.getAllFakultas();
+      if (response.success) {
+        setFakultas(response.data);
+      } else {
+        toast.error('Gagal memuat data fakultas');
+      }
     } catch (error) {
-      console.error("Gagal mengambil data fakultas:", error);
+      console.error('Gagal mengambil data fakultas:', error);
+      toast.error('Terjadi kesalahan saat mengambil data');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchFakultas();
-  }, []);
+  }, [fetchFakultas]);
 
   const handleOpenAddModal = () => {
     setEditingFakultas(null);
@@ -45,19 +51,25 @@ const AdminFakultasPage = () => {
   };
 
   const handleDelete = async (id: number) => {
-    if (window.confirm('Apakah Anda yakin ingin menghapus fakultas ini?')) {
-      try {
-        await fakultasService.deleteFakultas(id);
+    const confirmed = window.confirm('Apakah Anda yakin ingin menghapus fakultas ini?');
+    if (!confirmed) return;
+
+    try {
+      const response = await fakultasService.deleteFakultas(id);
+      if (response.success) {
         toast.success('Fakultas berhasil dihapus!');
         fetchFakultas();
-      } catch (error) {
-        console.error("Gagal menghapus fakultas:", error);
+      } else {
+        toast.error('Gagal menghapus fakultas.');
       }
+    } catch (error) {
+      console.error('Gagal menghapus fakultas:', error);
+      toast.error('Terjadi kesalahan saat menghapus fakultas.');
     }
   };
 
   return (
-    <>
+    <PageWrapper title="Kelola Fakultas">
       <div className="mb-6 flex justify-end">
         <Button onClick={handleOpenAddModal} variant="primary" icon="fas fa-plus-circle">
           Tambah Fakultas Baru
@@ -79,18 +91,38 @@ const AdminFakultasPage = () => {
             </thead>
             <tbody className="divide-y divide-gray-200">
               {isLoading ? (
-                <tr><td colSpan={3} className="text-center p-8 text-gray-500">Memuat data...</td></tr>
+                <tr>
+                  <td colSpan={3} className="text-center p-8 text-gray-500">
+                    Memuat data...
+                  </td>
+                </tr>
+              ) : fakultas.length === 0 ? (
+                <tr>
+                  <td colSpan={3} className="text-center p-8 text-gray-400 italic">
+                    Tidak ada data fakultas.
+                  </td>
+                </tr>
               ) : (
-                fakultas.map(fakulta => (
+                fakultas.map((fakulta) => (
                   <tr key={fakulta.id} className="hover:bg-gray-50">
                     <td className="p-4 font-medium text-gray-600">{fakulta.kode}</td>
                     <td className="p-4 font-medium text-gray-800">{fakulta.nama}</td>
                     <td className="p-4">
                       <div className="flex justify-center items-center space-x-2">
-                        <Button onClick={() => handleOpenEditModal(fakulta)} title="Edit Fakultas" variant="warning" size="icon">
+                        <Button
+                          onClick={() => handleOpenEditModal(fakulta)}
+                          title="Edit Fakultas"
+                          variant="warning"
+                          size="icon"
+                        >
                           <i className="fas fa-edit"></i>
                         </Button>
-                        <Button onClick={() => handleDelete(fakulta.id)} title="Hapus Fakultas" variant="danger" size="icon">
+                        <Button
+                          onClick={() => handleDelete(fakulta.id)}
+                          title="Hapus Fakultas"
+                          variant="danger"
+                          size="icon"
+                        >
                           <i className="fas fa-trash"></i>
                         </Button>
                       </div>
@@ -109,7 +141,7 @@ const AdminFakultasPage = () => {
         onSuccess={handleSuccess}
         initialData={editingFakultas}
       />
-    </>
+    </PageWrapper>
   );
 };
 

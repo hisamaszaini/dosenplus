@@ -1,5 +1,5 @@
 import api from './api';
-import type { CreateSemesterDto, UpdateSemesterDto, Semester } from '../../../sidupak-backend/src/semester/dto/semester.dto';
+import type { CreateSemesterDto, UpdateSemesterDto, Semester } from '../../../backend/src/semester/dto/semester.dto';
 
 interface GetAllSemestersParams {
   page?: number;

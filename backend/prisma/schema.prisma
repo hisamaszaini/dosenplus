@@ -14,10 +14,10 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  ADMIN
-  DOSEN
-  VALIDATOR
+model Setting {
+  id         Int    @id @default(autoincrement())
+  namaRektor String
+  nipRektor  String
 }
 
 enum UserStatus {
@@ -25,13 +25,10 @@ enum UserStatus {
   INACTIVE
 }
 
-enum NamaSemester {
-  GENAP
-  GANJIL
-}
-
-enum Jabatan {
-  LEKTOR
+enum TypeUserRole {
+  ADMIN
+  DOSEN
+  VALIDATOR
 }
 
 model User {
@@ -40,15 +37,29 @@ model User {
   username             String     @unique
   name                 String
   password             String
-  role                 Role       @default(DOSEN)
   status               UserStatus @default(ACTIVE)
   hashedRefreshToken   String?
   passwordResetToken   String?
   passwordResetExpires DateTime?
   createdAt            DateTime   @default(now())
-  updateAt             DateTime   @updatedAt
+  updatedAt            DateTime   @updatedAt
   dosen                Dosen?
   validator            Validator?
+  userRoles            UserRole[]
+}
+
+model Role {
+  id        Int        @id @default(autoincrement())
+  name      TypeUserRole     @unique
+  userRoles UserRole[]
+}
+
+model UserRole {
+  id     Int  @id @default(autoincrement())
+  userId Int
+  roleId Int
+  user   User @relation(fields: [userId], references: [id])
+  role   Role @relation(fields: [roleId], references: [id])
 }
 
 model Validator {
@@ -68,9 +79,15 @@ model Fakultas {
   prodi Prodi[]
   dosen Dosen[]
 
-  createdAt             DateTime                @default(now())
-  updateAt              DateTime                @updatedAt
-  PelaksanaanPendidikan PelaksanaanPendidikan[]
+  createdAt                 DateTime                    @default(now())
+  updateAt                  DateTime                    @updatedAt
+  Perkuliahan               Perkuliahan[]
+  BimbinganSeminar          BimbinganSeminar[]
+  BimbinganKknPknPkl        BimbinganKknPknPkl[]
+  PengembanganProgramKuliah PengembanganProgramKuliah[]
+  ProdukBahanLainnya        ProdukBahanLainnya[]
+  JabatanStruktural         JabatanStruktural[]
+  PengembanganDiri          PengembanganDiri[]
 }
 
 model Prodi {
@@ -86,30 +103,14 @@ model Prodi {
   createdAt DateTime @default(now())
   updateAt  DateTime @updatedAt
 
-  PelaksanaanPendidikan PelaksanaanPendidikan[]
-}
-
-model Semester {
-  id           Int          @id @default(autoincrement())
-  kode         Int
-  nama         String
-  tipe         NamaSemester
-  tahunMulai   Int
-  tahunSelesai Int
-  status       Boolean
-
-  createdAt             DateTime                @default(now())
-  updateAt              DateTime                @updatedAt
-  PelaksanaanPendidikan PelaksanaanPendidikan[]
-
-  @@index([tipe])
-  @@index([tahunMulai, tahunSelesai])
-}
-
-model Setting {
-  id         Int    @id @default(autoincrement())
-  name       String
-  nameRektor String
+  Perkuliahan               Perkuliahan[]
+  BimbinganSeminar          BimbinganSeminar[]
+  BimbinganKknPknPkl        BimbinganKknPknPkl[]
+  PengembanganProgramKuliah PengembanganProgramKuliah[]
+  ProdukBahanLainnya        ProdukBahanLainnya[]
+  JabatanStruktural         JabatanStruktural[]
+  BimbingDosen              BimbingDosen[]
+  PengembanganDiri          PengembanganDiri[]
 }
 
 model Dosen {
@@ -150,44 +151,83 @@ enum Jenjang {
   S3
 }
 
+enum KategoriPendidikan {
+  FORMAL
+  DIKLAT
+}
+
 model Pendidikan {
   id      Int   @id @default(autoincrement())
   dosenId Int
   dosen   Dosen @relation(fields: [dosenId], references: [id])
 
-  kategori String
+  kategori KategoriPendidikan
   kegiatan String?
   nilaiPak Int
 
-  // Untuk pendidikan formal
-  jenjang         String?
-  prodi           String?
-  fakultas        String?
-  perguruanTinggi String?
-  lulusTahun      Int?
-
-  jenisDiklat    String?
-  namaDiklat     String?
-  penyelenggara  String?
-  peran          String?
-  tingkatan      String?
-  jumlahJam      Int?
-  noSertifikat   String?
-  tglSertifikat  DateTime?
-  tempat         String?
-  tanggalMulai   DateTime?
-  tanggalSelesai DateTime?
-
-  file      String
+  filePath  String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  Formal PendidikanFormal?
+  Diklat PendidikanDiklat?
+}
+
+model PendidikanFormal {
+  id              Int        @id @default(autoincrement())
+  pendidikanId    Int        @unique
+  pendidikan      Pendidikan @relation(fields: [pendidikanId], references: [id], onDelete: Cascade)
+  jenjang         String
+  prodi           String
+  fakultas        String
+  perguruanTinggi String
+  lulusTahun      Int
+}
+
+model PendidikanDiklat {
+  id            Int        @id @default(autoincrement())
+  pendidikanId  Int        @unique
+  pendidikan    Pendidikan @relation(fields: [pendidikanId], references: [id], onDelete: Cascade)
+  jenisDiklat   String
+  namaDiklat    String
+  penyelenggara String
+  peran         String
+  tingkatan     String
+  jumlahJam     Int
+  noSertifikat  String
+  tglSertifikat DateTime
+  tempat        String
+  tglMulai      DateTime
+  tglSelesai    DateTime
+}
+
+enum NamaSemester {
+  GENAP
+  GANJIL
+}
+
+model Semester {
+  id           Int          @id @default(autoincrement())
+  kode         Int
+  nama         String
+  tipe         NamaSemester
+  tahunMulai   Int
+  tahunSelesai Int
+  status       Boolean
+
+  createdAt             DateTime                @default(now())
+  updateAt              DateTime                @updatedAt
+  PelaksanaanPendidikan PelaksanaanPendidikan[]
+
+  @@index([tipe])
+  @@index([tahunMulai, tahunSelesai])
 }
 
 enum KategoriKegiatan {
   PERKULIAHAN
   BIMBINGAN_SEMINAR
   BIMBINGAN_TUGAS_AKHIR
-  BIMBINGAN_KKN
+  BIMBINGAN_KKN_PKN_PKL
   PENGUJI_UJIAN_AKHIR
   PEMBINA_KEGIATAN_MHS
   PENGEMBANGAN_PROGRAM
@@ -195,7 +235,7 @@ enum KategoriKegiatan {
   ORASI_ILMIAH
   JABATAN_STRUKTURAL
   BIMBING_DOSEN
-  DATA_SERING
+  DATA_SERING_PENCAKOKAN
   PENGEMBANGAN_DIRI
 }
 
@@ -216,36 +256,249 @@ enum JabatanFungsional {
 }
 
 model PelaksanaanPendidikan {
-  id                Int                @id @default(autoincrement())
-  dosenId           Int
-  semesterId        Int
-  kategori          KategoriKegiatan
-  jenis             JenisKegiatan?
-  subJenis          String? // Disertasi, Tesis, dsb
-  jabatanFungsional JabatanFungsional? // Asisten Ahli, Lektor, dst
-  namaKegiatan      String?
-  jumlah            Int?
-  nilaiPak          Float              @default(0)
-  // totalPak          Float              @default(0)
-  deskripsi         String?
+  id         Int              @id @default(autoincrement())
+  dosenId    Int
+  semesterId Int
+  kategori   KategoriKegiatan
+  nilaiPak   Float            @default(0)
+  filePath   String
 
-  mataKuliah String?
-  sks        Int?
-  jumlahKelas     Int?
-  prodiId         Int?
-  fakultasId      Int?
-  perguruanTinggi String?
+  dosen    Dosen    @relation(fields: [dosenId], references: [id])
+  semester Semester @relation(fields: [semesterId], references: [id])
 
-  tglMulai   DateTime?
-  tglSelesai DateTime?
-
-  file String // URL ke file bukti PDF
-
-  dosen    Dosen     @relation(fields: [dosenId], references: [id])
-  semester Semester  @relation(fields: [semesterId], references: [id])
-  prodi    Prodi?    @relation(fields: [prodiId], references: [id])
-  fakultas Fakultas? @relation(fields: [fakultasId], references: [id])
+  perkuliahan          Perkuliahan?
+  bimbinganSeminar     BimbinganSeminar?
+  bimbinganKknPknPkl   BimbinganKknPknPkl?
+  bimbinganTugasAkhir  BimbinganTugasAkhir?
+  pengujiUjianAkhir    PengujiUjianAkhir?
+  pembinaKegiatanMhs   PembinaKegiatanMhs?
+  pengembanganProgram  PengembanganProgramKuliah?
+  bahanPengajaran      BahanPengajaran?
+  orasiIlmiah          OrasiIlmiah?
+  jabatanStruktural    JabatanStruktural?
+  bimbingDosen         BimbingDosen?
+  dataseringPencakokan DataseringPencakokan?
+  pengembanganDiri     PengembanganDiri?
 
   createdAt DateTime @default(now())
   updateAt  DateTime @updatedAt
+}
+
+model Perkuliahan {
+  id            Int    @id @default(autoincrement())
+  pelaksanaanId Int    @unique
+  mataKuliah    String
+  sks           Int
+  jumlahKelas   Int
+  totalSks      Int
+  prodiId       Int
+  fakultasId    Int
+
+  pelaksanaan PelaksanaanPendidikan @relation(fields: [pelaksanaanId], references: [id])
+  prodi       Prodi                 @relation(fields: [prodiId], references: [id])
+  fakultas    Fakultas              @relation(fields: [fakultasId], references: [id])
+}
+
+model BimbinganSeminar {
+  id            Int @id @default(autoincrement())
+  pelaksanaanId Int @unique
+  prodiId       Int
+  fakultasId    Int
+  jumlahMhs     Int
+
+  pelaksanaan PelaksanaanPendidikan @relation(fields: [pelaksanaanId], references: [id])
+  prodi       Prodi                 @relation(fields: [prodiId], references: [id])
+  fakultas    Fakultas              @relation(fields: [fakultasId], references: [id])
+}
+
+enum JenisKKNPKNPKL {
+  KKN
+  PKN
+  PKL
+}
+
+model BimbinganKknPknPkl {
+  id            Int            @id @default(autoincrement())
+  pelaksanaanId Int            @unique
+  jenis         JenisKKNPKNPKL
+  prodiId       Int
+  fakultasId    Int
+  jumlahMhs     Int
+
+  pelaksanaan PelaksanaanPendidikan @relation(fields: [pelaksanaanId], references: [id])
+  prodi       Prodi                 @relation(fields: [prodiId], references: [id])
+  fakultas    Fakultas              @relation(fields: [fakultasId], references: [id])
+}
+
+model BimbinganTugasAkhir {
+  id            Int    @id @default(autoincrement())
+  pelaksanaanId Int    @unique
+  jenis         String
+  peran         String
+  jumlahMhs     Int
+
+  pelaksanaan PelaksanaanPendidikan @relation(fields: [pelaksanaanId], references: [id])
+}
+
+model PengujiUjianAkhir {
+  id            Int    @id @default(autoincrement())
+  pelaksanaanId Int    @unique
+  peran         String
+  jumlahMhs     Int
+
+  pelaksanaan PelaksanaanPendidikan @relation(fields: [pelaksanaanId], references: [id])
+}
+
+model PembinaKegiatanMhs {
+  id            Int    @id @default(autoincrement())
+  pelaksanaanId Int    @unique
+  namaKegiatan  String
+  luaran        String
+
+  pelaksanaan PelaksanaanPendidikan @relation(fields: [pelaksanaanId], references: [id])
+}
+
+model PengembanganProgramKuliah {
+  id                  Int    @id @default(autoincrement())
+  pelaksanaanId       Int    @unique
+  programPengembangan String
+  prodiId             Int
+  fakultasId          Int
+  mataKuliah          String
+
+  pelaksanaan PelaksanaanPendidikan @relation(fields: [pelaksanaanId], references: [id])
+  prodi       Prodi                 @relation(fields: [prodiId], references: [id])
+  fakultas    Fakultas              @relation(fields: [fakultasId], references: [id])
+}
+
+enum JenisBahanPengajaran {
+  BUKU_AJAR
+  PRODUK_LAIN
+}
+
+model BahanPengajaran {
+  id            Int                  @id @default(autoincrement())
+  pelaksanaanId Int                  @unique
+  jenis         JenisBahanPengajaran
+
+  bukuAjarId   Int? @unique
+  produkLainId Int? @unique
+
+  bukuAjar   BukuAjar?           @relation("BukuAjarToBahanPengajaran", fields: [bukuAjarId], references: [id])
+  produkLain ProdukBahanLainnya? @relation("ProdukLainToBahanPengajaran", fields: [produkLainId], references: [id])
+
+  pelaksanaan PelaksanaanPendidikan @relation(fields: [pelaksanaanId], references: [id])
+}
+
+model BukuAjar {
+  id            Int      @id @default(autoincrement())
+  judul         String
+  tglTerbit     DateTime
+  penerbit      String
+  jumlahHalaman Int
+  isbn          String?
+
+  bahanPengajaran BahanPengajaran? @relation("BukuAjarToBahanPengajaran")
+}
+
+model ProdukBahanLainnya {
+  id            Int    @id @default(autoincrement())
+  jenisProduk   String
+  judul         String
+  jumlahHalaman Int
+  mataKuliah    String
+  prodiId       Int
+  fakultasId    Int
+
+  prodi    Prodi    @relation(fields: [prodiId], references: [id])
+  fakultas Fakultas @relation(fields: [fakultasId], references: [id])
+
+  bahanPengajaran BahanPengajaran? @relation("ProdukLainToBahanPengajaran")
+}
+
+enum Tingkat {
+  LOKAL
+  DAERAH
+  NASIONAL
+  INTERNASIONAL
+}
+
+model OrasiIlmiah {
+  id            Int      @id @default(autoincrement())
+  pelaksanaanId Int      @unique
+  namaKegiatan  String
+  deskripsi     String?
+  tingkat       Tingkat
+  penyelenggara String
+  tanggal       DateTime
+
+  pelaksanaan PelaksanaanPendidikan @relation(fields: [pelaksanaanId], references: [id])
+}
+
+model JabatanStruktural {
+  id            Int    @id @default(autoincrement())
+  pelaksanaanId Int    @unique
+  namaJabatan   String
+  prodiId       Int
+  fakultasId    Int
+  afiliasi      String
+
+  pelaksanaan PelaksanaanPendidikan @relation(fields: [pelaksanaanId], references: [id])
+  prodi       Prodi                 @relation(fields: [prodiId], references: [id])
+  fakultas    Fakultas              @relation(fields: [fakultasId], references: [id])
+}
+
+enum JenisBimbingan {
+  REGULER
+  PENCAKOKAN
+}
+
+model BimbingDosen {
+  id             Int               @id @default(autoincrement())
+  pelaksanaanId  Int               @unique
+  prodiId        Int
+  tglMulai       DateTime
+  tglSelesai     DateTime
+  jenisBimbingan JenisBimbingan
+  jabatan        JabatanFungsional
+  bidangAhli     String
+  deskripsi      String?
+  jumlahDsn      Int
+
+  pelaksanaan PelaksanaanPendidikan @relation(fields: [pelaksanaanId], references: [id])
+  prodi       Prodi                 @relation(fields: [prodiId], references: [id])
+}
+
+enum JenisDatasering {
+  DATASERING
+  PENCAKOKAN
+}
+
+model DataseringPencakokan {
+  id              Int                   @id @default(autoincrement())
+  pelaksanaanId   Int                   @unique
+  perguruanTinggi String
+  jenis           JenisDatasering
+  tglMulai        DateTime
+  tglSelesai      DateTime
+  bidangAhli      String
+  pelaksanaan     PelaksanaanPendidikan @relation(fields: [pelaksanaanId], references: [id])
+}
+
+model PengembanganDiri {
+  id            Int      @id @default(autoincrement())
+  pelaksanaanId Int      @unique
+  namaKegiatan  String
+  deskripsi     String?
+  tglMulai      DateTime
+  tglSelesai    DateTime
+  penyelenggara String
+  tempat        String
+  lamaJam       Int //Jam
+  prodiId       Int
+  fakultasId    Int
+
+  pelaksanaan PelaksanaanPendidikan @relation(fields: [pelaksanaanId], references: [id])
+  prodi       Prodi                 @relation(fields: [prodiId], references: [id])
+  fakultas    Fakultas              @relation(fields: [fakultasId], references: [id])
 }

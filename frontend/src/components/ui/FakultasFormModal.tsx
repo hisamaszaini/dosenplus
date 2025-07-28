@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
-import type { Fakultas } from '../../../../sidupak-backend/src/fakultas/dto/fakultas.dto';
-import { createFakultasSchema, type CreateFakultasDto } from '../../../../sidupak-backend/src/fakultas/dto/fakultas.dto';
+import type { Fakultas } from '../../../../backend/src/fakultas/dto/fakultas.dto';
+import { createFakultasSchema, type CreateFakultasDto } from '../../../../backend/src/fakultas/dto/fakultas.dto';
 import { createFakultas, updateFakultas } from '../../services/fakultas.service';
 
 import Button from './Button';

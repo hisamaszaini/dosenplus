@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
-import type { User, PaginatedResult } from '../../../../sidupak-backend/src/users/dto/user.dto';
-import type { Fakultas } from '../../../../sidupak-backend/src/fakultas/dto/fakultas.dto';
-import type { Prodi } from '../../../../sidupak-backend/src/prodi/dto/prodi.dto';
+import type { User } from '../../../../backend/src/users/dto/user.dto';
+import type { Fakultas } from '../../../../backend/src/fakultas/dto/fakultas.dto';
+import type { Prodi } from '../../../../backend/src/prodi/dto/prodi.dto';
 
 import * as userService from '../../services/user.service';
 import * as fakultasService from '../../services/fakultas.service';
@@ -15,7 +15,8 @@ import { ValidatorFormModal } from '../../components/ui/ValidatorFormModal';
 import { AdminFormModal } from '../../components/ui/AdminFormModal';
 
 export const AdminUserPage = () => {
-  const [usersData, setUsersData] = useState<PaginatedResult<User> | null>(null);
+  const [users, setUsers] = useState<User[]>([]);
+  const [meta, setMeta] = useState({ page: 1, limit: 10, total: 0, totalPages: 1 });
   const [isLoading, setIsLoading] = useState(true);
 
   const [isValidatorUserModalOpen, setIsValidatorUserModalOpen] = useState(false);
@@ -23,6 +24,9 @@ export const AdminUserPage = () => {
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
 
   const [editingUserId, setEditingUserId] = useState<number | null>(null);
+  const [selectedUserForEdit, setSelectedUserForEdit] = useState<User | null>(null);
+  const [roleSelectorModalOpen, setRoleSelectorModalOpen] = useState(false);
+
   const [fakultasList, setFakultasList] = useState<Fakultas[]>([]);
   const [prodiList, setProdiList] = useState<Prodi[]>([]);
 
@@ -41,8 +45,13 @@ export const AdminUserPage = () => {
         role: (filters.role || undefined) as 'ADMIN' | 'DOSEN' | 'VALIDATOR' | undefined,
         status: (filters.status || undefined) as 'ACTIVE' | 'INACTIVE' | undefined,
       };
-      const data = await userService.getAllUsers(params);
-      setUsersData(data);
+      const res = await userService.getAllUsers(params);
+      if (res.success) {
+        setUsers(res.data);
+        setMeta(res.meta);
+      } else {
+        toast.error('Gagal memuat data pengguna.');
+      }
     } catch (error) {
       console.error("Gagal mengambil data pengguna:", error);
       toast.error('Gagal memuat data pengguna.');
@@ -62,8 +71,8 @@ export const AdminUserPage = () => {
           fakultasService.getAllFakultas(),
           prodiService.getAllProdi()
         ]);
-        setFakultasList(fakultasData);
-        setProdiList(prodiData);
+        setFakultasList(fakultasData.data);
+        setProdiList(prodiData.data);
       } catch (error) {
         toast.error('Gagal memuat data fakultas atau prodi.');
         console.error(error);
@@ -98,9 +107,9 @@ export const AdminUserPage = () => {
     setIsAdminModalOpen(true);
   };
 
-  const handleOpenEditModal = (user: User) => {
-    setEditingUserId(user.id);
-    switch (user.role) {
+  const openModalForRole = (role: string, userId: number) => {
+    setEditingUserId(userId);
+    switch (role) {
       case 'DOSEN':
         setIsDosenModalOpen(true);
         break;
@@ -112,7 +121,16 @@ export const AdminUserPage = () => {
         break;
       default:
         toast.error('Role tidak dikenali.');
-        break;
+    }
+  };
+
+  const handleOpenEditModal = (user: User) => {
+    const roles = user.userRoles.map(r => r.role.name);
+    if (roles.length === 1) {
+      openModalForRole(roles[0], user.id);
+    } else {
+      setSelectedUserForEdit(user);
+      setRoleSelectorModalOpen(true);
     }
   };
 
@@ -129,7 +147,7 @@ export const AdminUserPage = () => {
       try {
         await userService.deleteUser(id);
         toast.success('Pengguna berhasil dihapus!');
-        if (usersData?.data.length === 1 && currentPage > 1) {
+        if (users.length === 1 && currentPage > 1) {
           setCurrentPage(currentPage - 1);
         } else {
           fetchUsers();
@@ -158,7 +176,6 @@ export const AdminUserPage = () => {
         </div>
       </div>
 
-      {/* Filter dan Search */}
       <div className="bg-white rounded-2xl shadow-xl pb-6 px-4 md:px-6">
         <div className="py-5 border-b border-gray-200 mb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
           <input
@@ -181,7 +198,6 @@ export const AdminUserPage = () => {
           </select>
         </div>
 
-        {/* Tabel */}
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50">
@@ -196,12 +212,12 @@ export const AdminUserPage = () => {
             <tbody className="divide-y divide-gray-200">
               {isLoading ? (
                 <tr><td colSpan={5} className="text-center p-8 text-gray-500">Memuat data...</td></tr>
-              ) : usersData && usersData.data.length > 0 ? (
-                usersData.data.map(user => (
+              ) : users.length > 0 ? (
+                users.map(user => (
                   <tr key={user.id} className="hover:bg-gray-50">
                     <td className="p-4 font-medium text-gray-800">{user.dosen?.nama ?? user.name}</td>
                     <td className="p-4 text-gray-700">{user.email}</td>
-                    <td className="p-4 text-center"><span className="font-mono text-xs">{user.role}</span></td>
+                    <td className="p-4 text-center"><span className="font-mono text-xs">{user.userRoles.map(r => r.role.name).join(', ')}</span></td>
                     <td className="p-4 text-center">
                       <span className={`inline-flex items-center px-3 py-1 rounded-full font-medium text-xs ${user.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                         {user.status === 'ACTIVE' ? 'Aktif' : 'Tidak Aktif'}
@@ -226,17 +242,13 @@ export const AdminUserPage = () => {
           </table>
         </div>
 
-        {/* Pagination */}
-        {usersData && usersData.meta.total > 0 && (
+        {meta.total > 0 && (
           <div className="mt-4 px-2 flex justify-between items-center text-sm text-gray-600">
-            <span>
-              Menampilkan {usersData.data.length} dari {usersData.meta.total} hasil
-            </span>
+            <span>Menampilkan {users.length} dari {meta.total} hasil</span>
             <div className="flex items-center gap-2">
               <Button
-                onClick={() => setCurrentPage(currentPage - 1)}
-                disabled={!usersData.meta.hasPrev}
-                applyDisabledStyle={true}
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage <= 1}
                 variant="secondary"
                 size="small"
                 icon="fas fa-chevron-left"
@@ -244,9 +256,8 @@ export const AdminUserPage = () => {
                 Sebelumnya
               </Button>
               <Button
-                onClick={() => setCurrentPage(currentPage + 1)}
-                disabled={!usersData.meta.hasNext}
-                applyDisabledStyle={true}
+                onClick={() => setCurrentPage(prev => Math.min(meta.totalPages, prev + 1))}
+                disabled={currentPage >= meta.totalPages}
                 variant="secondary"
                 size="small"
                 icon="fas fa-chevron-right"
@@ -258,7 +269,35 @@ export const AdminUserPage = () => {
         )}
       </div>
 
-      {/* Modal Section */}
+      {roleSelectorModalOpen && selectedUserForEdit && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex justify-center items-center">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-bold mb-4 text-gray-700">Pilih Role yang Akan Diedit</h3>
+            <div className="space-y-2">
+              {selectedUserForEdit.userRoles.map(({ role }) => (
+                <Button
+                  key={role.name}
+                  variant="primary"
+                  onClick={() => {
+                    openModalForRole(role.name, selectedUserForEdit.id);
+                    setRoleSelectorModalOpen(false);
+                    setSelectedUserForEdit(null);
+                  }}
+                  className="w-full"
+                >
+                  Edit sebagai {role.name}
+                </Button>
+              ))}
+            </div>
+            <div className="mt-4 text-right">
+              <Button variant="secondary" onClick={() => setRoleSelectorModalOpen(false)}>
+                Batal
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <ValidatorFormModal
         isOpen={isValidatorUserModalOpen}
         onClose={() => setIsValidatorUserModalOpen(false)}

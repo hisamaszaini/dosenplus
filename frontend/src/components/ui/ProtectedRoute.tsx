@@ -1,14 +1,14 @@
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import Spinner from '../ui/Spinner';
 import type { Role } from '../../types/user.types';
+import Spinner from './Spinner';
 
 interface ProtectedRouteProps {
   allowedRoles?: Role[];
 }
 
-const ProtectedRoute = ({allowedRoles}: ProtectedRouteProps) => {
-  const { user, isLoading } = useAuth();
+const ProtectedRoute = ({ allowedRoles }: ProtectedRouteProps) => {
+  const { user, activeRole, isLoading, roles } = useAuth();
 
   if (isLoading) {
     return <Spinner />;
@@ -18,8 +18,8 @@ const ProtectedRoute = ({allowedRoles}: ProtectedRouteProps) => {
     return <Navigate to="/login" replace />;
   }
 
-  if(allowedRoles && !allowedRoles.includes(user.role)){
-    return <Navigate to="/unathorized" replace />;
+  if (allowedRoles && (!activeRole || !allowedRoles.includes(activeRole))) {
+    return <Navigate to="/unauthorized" replace />;
   }
 
   return <Outlet />;

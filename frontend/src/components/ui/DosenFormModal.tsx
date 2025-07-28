@@ -6,9 +6,9 @@ import { toast } from 'sonner';
 import * as userService from '../../services/user.service';
 import Button from './Button';
 import FormField from './FormField';
-import { createDosenUserSchema, updateDosenProfileSchema, type CreateDosenUserDto, type UpdateDosenProfileDto, type User } from '../../../../sidupak-backend/src/users/dto/user.dto';
-import type { Fakultas } from '../../../../sidupak-backend/src/fakultas/dto/fakultas.dto';
-import type { Prodi } from '../../../../sidupak-backend/src/prodi/dto/prodi.dto';
+import { createDosenUserSchema, updateDosenProfileSchema, type CreateDosenUserDto, type UpdateDosenProfileDto, type User } from '../../../../backend/src/users/dto/user.dto';
+import type { Fakultas } from '../../../../backend/src/fakultas/dto/fakultas.dto';
+import type { Prodi } from '../../../../backend/src/prodi/dto/prodi.dto';
 
 interface Props {
     isOpen: boolean;

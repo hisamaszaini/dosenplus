@@ -16,7 +16,7 @@ import {
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { Role } from '@prisma/client';
+import { TypeUserRole } from '@prisma/client';
 import { UsersService } from './users.service';
 import {
   ChangePasswordDto,
@@ -54,7 +54,7 @@ export class UsersController {
    * DOSEN memperbarui profilnya sendiri.
    */
   @Patch('profile/dosen')
-  @Roles(Role.DOSEN)
+  @Roles(TypeUserRole.DOSEN)
   updateMyDosenProfile(@Request() req, @Body() dto: UpdateDosenProfileDto) {
     const userId = req.user.sub;
     return this.usersService.updateDosenProfile(userId, dto);
@@ -64,7 +64,7 @@ export class UsersController {
    * VALIDATOR memperbarui profilnya sendiri.
    */
   @Patch('profile/validator')
-  @Roles(Role.VALIDATOR)
+  @Roles(TypeUserRole.VALIDATOR)
   updateMyValidatorProfile(@Request() req, @Body() dto: UpdateValidatorProfileDto) {
     const userId = req.user.sub;
     return this.usersService.updateValidatorProfile(userId, dto);
@@ -74,7 +74,7 @@ export class UsersController {
    * ADMIN memperbarui profilnya sendiri.
    */
   @Patch('profile/admin')
-  @Roles(Role.ADMIN)
+  @Roles(TypeUserRole.ADMIN)
   updateMyAdminProfile(@Request() req, @Body() dto: UpdateAdminProfileDto) {
     const userId = req.user.sub;
     return this.usersService.updateAdminProfile(userId, dto);
@@ -97,7 +97,7 @@ export class UsersController {
    * [ADMIN] Membuat pengguna baru dengan role DOSEN.
    */
   @Post('dosen')
-  @Roles(Role.ADMIN)
+  @Roles(TypeUserRole.ADMIN)
   @HttpCode(HttpStatus.CREATED)
   createDosenUser(@Body() dto: CreateDosenUserDto) {
     return this.usersService.createDosenWithUserAccount(dto);
@@ -107,7 +107,7 @@ export class UsersController {
    * [ADMIN] Membuat pengguna admin baru
    */
   @Post('admin')
-  @Roles(Role.ADMIN)
+  @Roles(TypeUserRole.ADMIN)
   @HttpCode(HttpStatus.CREATED)
   createAdminUser(@Body() dto: CreateAdminUserDto) {
     return this.usersService.createAdminUser(dto);
@@ -117,7 +117,7 @@ export class UsersController {
    * [ADMIN] Membuat pengguna validator baru
    */
   @Post('validator')
-  @Roles(Role.ADMIN)
+  @Roles(TypeUserRole.ADMIN)
   @HttpCode(HttpStatus.CREATED)
   createValidatorUser(@Body() dto: CreateValidatorUserDto) {
     return this.usersService.createValidatorUser(dto);
@@ -128,7 +128,7 @@ export class UsersController {
    * Contoh: /users?page=1&limit=10&search=john&role=DOSEN
    */
   @Get()
-  @Roles(Role.ADMIN)
+  @Roles(TypeUserRole.ADMIN)
   findAll(@Query(new ZodValidationPipe(findAllUsersSchema)) query: FindAllUsersDto) {
     return this.usersService.findAll(query);
   }
@@ -138,7 +138,7 @@ export class UsersController {
    * Contoh: /users/search?q=ahmad
    */
   @Get('search')
-  @Roles(Role.ADMIN)
+  @Roles(TypeUserRole.ADMIN)
   searchUsers(@Query('q') query: string) {
     return this.usersService.searchUsers(query);
   }
@@ -147,7 +147,7 @@ export class UsersController {
    * [ADMIN] Mendapatkan detail lengkap pengguna berdasarkan ID.
    */
   @Get(':id')
-  @Roles(Role.ADMIN)
+  @Roles(TypeUserRole.ADMIN)
   findById(@Param('id', ParseIntPipe) id: number) {
     return this.usersService.findById(id);
   }
@@ -156,7 +156,7 @@ export class UsersController {
    * [ADMIN] Memperbarui profil DOSEN.
    */
   @Patch(':id/profile/dosen')
-  @Roles(Role.ADMIN)
+  @Roles(TypeUserRole.ADMIN)
   updateDosenProfile(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateDosenProfileDto,
@@ -168,7 +168,7 @@ export class UsersController {
    * [ADMIN] Memperbarui profil Validator.
    */
   @Patch(':id/profile/validator')
-  @Roles(Role.ADMIN)
+  @Roles(TypeUserRole.ADMIN)
   updateValidatorProfile(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateValidatorProfileDto,
@@ -180,7 +180,7 @@ export class UsersController {
    * [ADMIN] Memperbarui profil Admin lain.
    */
   @Patch(':id/profile/admin')
-  @Roles(Role.ADMIN)
+  @Roles(TypeUserRole.ADMIN)
   updateAdminProfile(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateAdminProfileDto,
@@ -192,7 +192,7 @@ export class UsersController {
    * [ADMIN] Memperbarui status pengguna (misal: ACTIVE, INACTIVE).
    */
   @Patch(':id/status')
-  @Roles(Role.ADMIN)
+  @Roles(TypeUserRole.ADMIN)
   updateUserStatus(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateUserStatusDto,
@@ -204,7 +204,7 @@ export class UsersController {
    * [ADMIN] Menghapus pengguna secara permanen.
    */
   @Delete(':id')
-  @Roles(Role.ADMIN)
+  @Roles(TypeUserRole.ADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.usersService.remove(id);
@@ -214,7 +214,7 @@ export class UsersController {
    * [ADMIN] Menjalankan pengecekan integritas data.
    */
   @Get('maintenance/check-integrity')
-  @Roles(Role.ADMIN)
+  @Roles(TypeUserRole.ADMIN)
   checkDataIntegrity() {
     return this.usersService.fixMissingRelationalData();
   }

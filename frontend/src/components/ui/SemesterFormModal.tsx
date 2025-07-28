@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { Semester } from '../../types/semester.types';
-import { createSemesterSchema, type CreateSemesterDto } from '../../../../sidupak-backend/src/semester/dto/semester.dto';
+import { createSemesterSchema, type CreateSemesterDto } from '../../../../backend/src/semester/dto/semester.dto';
 import { createSemester, updateSemester } from '../../services/semester.service';
 import Button from './Button';
 
@@ -42,7 +42,7 @@ const SemesterFormModal = ({ isOpen, onClose, onSuccess, initialData }: Semester
       reset({ tipe, tahunMulai, tahunSelesai, status });
     } else {
       reset({
-        tipe: 'GANJIL',
+        tipe: undefined,
         tahunMulai: undefined,
         tahunSelesai: undefined,
         status: true
@@ -86,6 +86,7 @@ const SemesterFormModal = ({ isOpen, onClose, onSuccess, initialData }: Semester
         <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
           <FormField label="Tipe">
             <select {...register('tipe')} className="w-full md:flex-1 px-4 py-3 rounded-xl bg-white/80 border border-gray-300 focus:border-accent focus:ring-2 focus:ring-accent/30 hover:border-accent outline-none transition-all duration-300 text-gray-700 placeholder-gray-400 shadow-sm">
+              <option value="">--- Pilih Semester ---</option>
               <option value="GANJIL">Ganjil</option>
               <option value="GENAP">Genap</option>
             </select>

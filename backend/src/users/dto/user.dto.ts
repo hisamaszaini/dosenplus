@@ -1,8 +1,20 @@
-import { Role, UserStatus } from '@prisma/client';
+import { TypeUserRole, UserStatus } from '@prisma/client';
 import { z } from 'zod';
 
 // =================================================================
-// SKEMA AUTENTIKASI
+// ENUMS & TYPES
+// =================================================================
+
+export const USER_STATUSES = {
+  ACTIVE: 'ACTIVE',
+  INACTIVE: 'INACTIVE',
+  PENDING: 'PENDING',
+} as const;
+
+export type UserStatusType = typeof USER_STATUSES[keyof typeof USER_STATUSES];
+
+// =================================================================
+// SKEMA LOGIN
 // =================================================================
 
 export const loginSchema = z.object({
@@ -11,27 +23,24 @@ export const loginSchema = z.object({
 });
 
 // =================================================================
-// SKEMA PENDAFTARAN (CREATE)
+// SKEMA BIODATA & DATA KEPEGAWAIAN
 // =================================================================
 
-const createDosenBiodataSchema = z.object({
-  nama: z.string().min(3, { message: 'Nama lengkap minimal 3 karakter' }),
+export const createDosenBiodataSchema = z.object({
+  nama: z.string().min(3),
   nip: z.string().optional(),
   nuptk: z.string().optional(),
-  jenis_kelamin: z.enum(['Laki-laki', 'Perempuan'], { message: 'Jenis kelamin harus Laki-laki atau Perempuan' }),
+  jenis_kelamin: z.enum(['Laki-laki', 'Perempuan']),
   no_hp: z.string().optional(),
-  prodiId: z.number().int({ message: 'Prodi harus dipilih' }),
-  fakultasId: z.number().int({ message: 'Fakultas harus dipilih' }),
-  jabatan: z.enum(['Asisten Ahli', 'Lektor', 'Lektor Kepala', 'Guru Besar'], {
-    message: 'Jabatan harus dipilih',
-  }),
-  // jabatan: z.string().optional(),
+  prodiId: z.number().int(),
+  fakultasId: z.number().int(),
+  jabatan: z.enum(['Asisten Ahli', 'Lektor', 'Lektor Kepala', 'Guru Besar']),
 });
 
-const createValidatorBiodataSchema = z.object({
-  nama: z.string().min(3, { message: 'Nama lengkap minimal 3 karakter' }),
+export const createValidatorBiodataSchema = z.object({
+  nama: z.string().min(3),
   nip: z.string().optional(),
-  jenis_kelamin: z.enum(['Laki-laki', 'Perempuan'], { message: 'Jenis kelamin harus Laki-laki atau Perempuan' }),
+  jenis_kelamin: z.enum(['Laki-laki', 'Perempuan']),
   no_hp: z.string().optional(),
 });
 
@@ -44,17 +53,24 @@ export const createDataKepegawaianSchema = z.object({
   no_kk: z.string().optional(),
 });
 
-export const createUserSchema = z.object({
-  email: z.string().email({ message: 'Format email tidak valid' }),
-  username: z.string().min(3, { message: 'Username minimal 3 karakter' }),
-  name: z.string().min(3, { message: 'Nama minimal 3 karakter' }),
-  status: z.nativeEnum(UserStatus).optional(),
-  password: z.string().min(8, { message: 'Password minimal 8 karakter' }),
-  confirmPassword: z.string().min(8, { message: 'Konfirmasi password minimal 8 karakter' }),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: 'Password dan konfirmasi password tidak cocok',
-  path: ['confirmPassword'],
-}).transform(({ confirmPassword, ...rest }) => rest);
+// =================================================================
+// SKEMA USER (CREATE / UPDATE)
+// =================================================================
+
+export const createUserSchema = z
+  .object({
+    email: z.string().email(),
+    username: z.string().min(3),
+    name: z.string().min(3),
+    status: z.nativeEnum(UserStatus).optional(),
+    password: z.string().min(8),
+    confirmPassword: z.string().min(8),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: 'Password dan konfirmasi password tidak cocok',
+    path: ['confirmPassword'],
+  })
+  .transform(({ confirmPassword, ...rest }) => rest);
 
 export const createAdminUserSchema = z.object({
   dataUser: createUserSchema,
@@ -72,113 +88,38 @@ export const createDosenUserSchema = z.object({
 });
 
 // =================================================================
-// SKEMA PAGINATION DAN SEARCH
+// SKEMA PAGINATION & SEARCH
 // =================================================================
 
 export const findAllUsersSchema = z.object({
-  page: z.coerce.number().int().min(1).optional().default(1),
-  limit: z.coerce.number().int().min(1).max(100).optional().default(20),
+  page: z.coerce.number().min(1).optional().default(1),
+  limit: z.coerce.number().min(1).max(100).optional().default(20),
   search: z.string().optional(),
-  role: z.nativeEnum(Role).optional(),
+  roles: z.array(z.nativeEnum(TypeUserRole)).optional(),
   status: z.nativeEnum(UserStatus).optional(),
 });
 
-// =================================================================
-// SKEMA AKSI PENGGUNA (UPDATE)
-// =================================================================
-
-export const updateDosenProfileSchema = z.object({
-  dataUser: z.object({
-    email: z.string().email({ message: 'Format email tidak valid' }),
-    username: z.string().min(3, { message: 'Username minimal 3 karakter' }),
-    name: z.string().min(3, { message: 'Nama minimal 3 karakter' }),
-    status: z.nativeEnum(UserStatus),
-    password: z.string().min(8, { message: 'Password minimal 8 karakter' }).optional().or(z.literal('')),
-    confirmPassword: z.string().min(8, { message: 'Konfirmasi password minimal 8 karakter' }).optional().or(z.literal('')),
-  })
-    .refine((data) => {
-      if (data.password || data.confirmPassword) {
-        return data.password === data.confirmPassword;
-      }
-      return true;
-    }, {
-      message: 'Password dan konfirmasi password tidak cocok',
-      path: ['confirmPassword'],
-    })
-    .transform(({ confirmPassword, ...rest }) => rest),
-
-  biodata: createDosenBiodataSchema,
-  dataKepegawaian: createDataKepegawaianSchema.optional(),
+export const searchUsersSchema = z.object({
+  query: z.string().min(1),
+  limit: z.number().int().min(1).max(50).optional().default(10),
 });
 
-export const updateValidatorProfileSchema = z.object({
-  dataUser: z.object({
-    email: z.string().email({ message: 'Format email tidak valid' }),
-    username: z.string().min(3, { message: 'Username minimal 3 karakter' }),
-    name: z.string().min(3, { message: 'Nama minimal 3 karakter' }),
-    status: z.nativeEnum(UserStatus),
-    password: z.string().min(8, { message: 'Password minimal 8 karakter' }).optional().or(z.literal('')),
-    confirmPassword: z.string().min(8, { message: 'Konfirmasi password minimal 8 karakter' }).optional().or(z.literal('')),
-  })
-    .refine((data) => {
-      if (data.password || data.confirmPassword) {
-        return data.password === data.confirmPassword;
-      }
-      return true;
-    }, {
-      message: 'Password dan konfirmasi password tidak cocok',
-      path: ['confirmPassword'],
-    })
-    .transform(({ confirmPassword, ...rest }) => rest),
-
-  biodata: createValidatorBiodataSchema,
-});
-
-export const updateAdminProfileSchema = z.object({
-  dataUser: z.object({
-    email: z.string().email({ message: 'Format email tidak valid' }),
-    username: z.string().min(3, { message: 'Username minimal 3 karakter' }),
-    name: z.string().min(3, { message: 'Nama minimal 3 karakter' }),
-    status: z.enum(UserStatus),
-    password: z.string().min(8, { message: 'Password minimal 8 karakter' }).optional().or(z.literal('')),
-    confirmPassword: z.string().min(8, { message: 'Konfirmasi password minimal 8 karakter' }).optional().or(z.literal('')),
-  })
-    .refine((data) => {
-      if (data.password || data.confirmPassword) {
-        return data.password === data.confirmPassword;
-      }
-      return true;
-    }, {
-      message: 'Password dan konfirmasi password tidak cocok',
-      path: ['confirmPassword'],
-    })
-    .transform(({ confirmPassword, ...rest }) => rest),
-});
-
-export const changePasswordSchema = z
-  .object({
-    oldPassword: z.string().min(1, 'Password lama tidak boleh kosong'),
-    newPassword: z.string().min(8, 'Password baru minimal 8 karakter'),
-    confirmPassword: z.string().min(8, 'Konfirmasi password minimal 8 karakter'),
-  })
-  .refine((data) => data.newPassword === data.confirmPassword, {
-    message: 'Password baru dan konfirmasi password tidak cocok',
-    path: ['confirmPassword'],
-  })
-  .refine((data) => data.oldPassword !== data.newPassword, {
-    message: 'Password baru harus berbeda dengan password lama',
-    path: ['newPassword'],
-  });
-
 // =================================================================
-// SKEMA KHUSUS ADMIN
+// SKEMA USER PROFILE & ROLE RESPONSE
 // =================================================================
 
-export const updateUserStatusSchema = z.object({
-  status: z.nativeEnum(UserStatus, { message: 'Status tidak valid' }),
+export const roleDataSchema = z.object({
+  id: z.number(),
+  name: z.nativeEnum(TypeUserRole),
 });
 
-// Skema untuk data kepegawaian yang di-nest
+const userRoleSchema = z.object({
+  id: z.number(),
+  userId: z.number(),
+  roleId: z.number(),
+  role: roleDataSchema,
+});
+
 const dataKepegawaianSchema = z.object({
   id: z.number().optional(),
   npwp: z.string().nullable(),
@@ -191,20 +132,17 @@ const dataKepegawaianSchema = z.object({
   updatedAt: z.date().optional(),
 });
 
-// Skema untuk data Fakultas
 const fakultasSchema = z.object({
   id: z.number(),
   nama: z.string(),
 });
 
-// Skema untuk data Prodi
 const prodiSchema = z.object({
   id: z.number(),
   nama: z.string(),
   fakultasId: z.number().optional(),
 });
 
-// Skema untuk data Dosen lengkap yang di-nest
 const dosenResponseSchema = z.object({
   id: z.number(),
   nama: z.string(),
@@ -217,14 +155,12 @@ const dosenResponseSchema = z.object({
   fakultasId: z.number(),
   createdAt: z.date().optional(),
   updatedAt: z.date().optional(),
-  // Relasi
   dataKepegawaian: dataKepegawaianSchema.nullable().optional(),
   fakultas: fakultasSchema.optional(),
   prodi: prodiSchema.optional(),
-  pendidikan: z.array(z.any()).optional(), // Schema pendidikan bisa didefinisikan lebih detail jika diperlukan
+  pendidikan: z.array(z.any()).optional(),
 });
 
-// Skema untuk data Validator
 const validatorResponseSchema = z.object({
   id: z.number(),
   nama: z.string(),
@@ -240,19 +176,80 @@ export const userResponseSchema = z.object({
   email: z.string().email(),
   username: z.string(),
   name: z.string(),
-  role: z.nativeEnum(Role),
   status: z.nativeEnum(UserStatus),
   createdAt: z.date(),
   updatedAt: z.date(),
-
-  // Relasi ke Dosen, bisa null jika role bukan Dosen
+  userRoles: z.array(userRoleSchema),
   dosen: dosenResponseSchema.nullable().optional(),
-
-  // Relasi ke Validator, bisa null jika role bukan Validator
   validator: validatorResponseSchema.nullable().optional(),
 });
 
-// Skema untuk pagination metadata
+// =================================================================
+// SKEMA UPDATE PROFILE
+// =================================================================
+
+const baseUpdateUserSchema = z
+  .object({
+    email: z.string().email(),
+    username: z.string().min(3),
+    name: z.string().min(3),
+    status: z.nativeEnum(UserStatus),
+    password: z.string().min(8).optional().or(z.literal('')),
+    confirmPassword: z.string().min(8).optional().or(z.literal('')),
+  })
+  .refine((data) => {
+    if (data.password || data.confirmPassword) {
+      return data.password === data.confirmPassword;
+    }
+    return true;
+  }, {
+    message: 'Password dan konfirmasi password tidak cocok',
+    path: ['confirmPassword'],
+  })
+  .transform(({ confirmPassword, ...rest }) => rest);
+
+export const updateAdminProfileSchema = z.object({
+  dataUser: baseUpdateUserSchema,
+});
+
+export const updateDosenProfileSchema = z.object({
+  dataUser: baseUpdateUserSchema,
+  biodata: createDosenBiodataSchema,
+  dataKepegawaian: createDataKepegawaianSchema.optional(),
+});
+
+export const updateValidatorProfileSchema = z.object({
+  dataUser: baseUpdateUserSchema,
+  biodata: createValidatorBiodataSchema,
+});
+
+// =================================================================
+// SKEMA PASSWORD & STATUS
+// =================================================================
+
+export const changePasswordSchema = z
+  .object({
+    oldPassword: z.string().min(1),
+    newPassword: z.string().min(8),
+    confirmPassword: z.string().min(8),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: 'Password baru dan konfirmasi password tidak cocok',
+    path: ['confirmPassword'],
+  })
+  .refine((data) => data.oldPassword !== data.newPassword, {
+    message: 'Password baru harus berbeda dari password lama',
+    path: ['newPassword'],
+  });
+
+export const updateUserStatusSchema = z.object({
+  status: z.nativeEnum(UserStatus),
+});
+
+// =================================================================
+// PAGINATED RESPONSE SCHEMA
+// =================================================================
+
 export const paginationMetaSchema = z.object({
   page: z.number(),
   limit: z.number(),
@@ -262,32 +259,13 @@ export const paginationMetaSchema = z.object({
   hasPrev: z.boolean(),
 });
 
-// Skema untuk response pagination
 export const paginatedUserResponseSchema = z.object({
   data: z.array(userResponseSchema),
   meta: paginationMetaSchema,
 });
 
-// Skema untuk search response
-export const searchUsersSchema = z.object({
-  query: z.string().min(1, { message: 'Query pencarian tidak boleh kosong' }),
-  limit: z.number().int().min(1).max(50).optional().default(10),
-});
-
-export type PaginatedResult<T> = {
-  data: T[];
-  meta: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-    hasNext: boolean;
-    hasPrev: boolean;
-  };
-};
-
 // =================================================================
-// EKSPOR TIPE-TIPE DATA
+// EKSPOR TYPE
 // =================================================================
 
 export type LoginDto = z.infer<typeof loginSchema>;
@@ -298,10 +276,13 @@ export type FindAllUsersDto = z.infer<typeof findAllUsersSchema>;
 export type UpdateDosenProfileDto = z.infer<typeof updateDosenProfileSchema>;
 export type UpdateAdminProfileDto = z.infer<typeof updateAdminProfileSchema>;
 export type UpdateValidatorProfileDto = z.infer<typeof updateValidatorProfileSchema>;
-export type UpdateDataKepegawaianDto = z.infer<typeof dataKepegawaianSchema>;
 export type ChangePasswordDto = z.infer<typeof changePasswordSchema>;
 export type UpdateUserStatusDto = z.infer<typeof updateUserStatusSchema>;
 export type SearchUsersDto = z.infer<typeof searchUsersSchema>;
+export type UpdateDataKepegawaianDto = z.infer<typeof dataKepegawaianSchema>;
+
+export type RoleData = z.infer<typeof roleDataSchema>;
+export type UserRole = z.infer<typeof userRoleSchema>;
 export type User = z.infer<typeof userResponseSchema>;
 export type PaginatedUserResponse = z.infer<typeof paginatedUserResponseSchema>;
 export type PaginationMeta = z.infer<typeof paginationMetaSchema>;

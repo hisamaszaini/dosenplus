@@ -1,234 +1,265 @@
-import { Injectable, NotFoundException, ForbiddenException, StreamableFile, BadRequestException, InternalServerErrorException } from '@nestjs/common';
-import { CreatePendidikanDto, createPendidikanSchema, FindAllQueryDto } from './dto/create-pendidikan.dto';
-import { UpdatePendidikanDto, updatePendidikanSchema } from './dto/update-pendidikan.dto';
-import { Prisma, Role } from '@prisma/client';
-import { PrismaService } from 'prisma/prisma.service';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
-import z from 'zod';
 import { v4 as uuidv4 } from 'uuid';
-
-interface FindAllParams {
-  page?: number;
-  limit?: number;
-  search?: string;
-  sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
-  kategori?: string;
-  jenjang?: string;
-  lulusTahun?: number;
-  userId: number;
-  role: Role;
-}
-
-interface CreatePendidikanServiceDto extends CreatePendidikanDto {
-  dosenId: number;
-  file: Express.Multer.File;
-}
-
-interface UpdatePendidikanServiceDto extends UpdatePendidikanDto {
-  dosenId: number;
-  file?: Express.Multer.File;
-}
-
-// tambahkan di pendidikan.service.ts
-interface PendidikanFormalData
-  extends Omit<CreatePendidikanServiceDto, 'file' | 'kategori' | 'jenisDiklat' | 'namaDiklat' | 'penyelenggara' | 'peran' | 'tingkatan' | 'jumlahJam' | 'tglSertifikat' | 'tempat' | 'tanggalMulai' | 'tanggalSelesai'> { }
-interface DiklatData
-  extends Omit<CreatePendidikanServiceDto, 'file' | 'kategori' | 'jenjang' | 'prodi' | 'fakultas' | 'perguruanTinggi' | 'lulusTahun'> { }
+import { PrismaService } from 'prisma/prisma.service';
+import { KategoriPendidikan, TypeUserRole } from '@prisma/client';
+import { CreatePendidikanDto, fullPendidikanSchema } from './dto/create-pendidikan.dto';
+import { fullUpdatePendidikanSchema, UpdatePendidikanDto } from './dto/update-pendidikan.dto';
+import { DataAndFileService } from 'src/utils/dataAndFile';
 
 @Injectable()
 export class PendidikanService {
   private readonly UPLOAD_PATH = path.resolve(process.cwd(), 'uploads/pendidikan');
 
-  constructor(private readonly prisma: PrismaService) {
-  }
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly fileUtil: DataAndFileService,
+  ) {}
 
-  private ensureDir() {
-    if (!fs.existsSync(this.UPLOAD_PATH)) fs.mkdirSync(this.UPLOAD_PATH, { recursive: true });
-  }
+  private getNilaiPak(data: CreatePendidikanDto | UpdatePendidikanDto): number {
+    if (data.kategori === KategoriPendidikan.DIKLAT) return 3;
 
-  private fileName(original: string) {
-    return `${uuidv4()}${path.extname(original)}`;
-  }
-
-  private async write(file: Express.Multer.File, name: string) {
-    try {
-      await fs.promises.writeFile(path.join(this.UPLOAD_PATH, name), file.buffer);
-    } catch {
-      throw new InternalServerErrorException('Gagal menyimpan file');
+    if (data.kategori === KategoriPendidikan.FORMAL) {
+      if (data.jenjang === 'S2') return 150;
+      if (data.jenjang === 'S3') return 200;
     }
-  }
 
-  private getNilaiPak(kategori: string, jenjang?: string): number {
-    if (kategori === 'Diklat') return 3;
-
-    const n = jenjang?.toLowerCase().trim() ?? '';
-    if (n === 's2' || n.includes('magister')) return 150;
-    if (n === 's3' || n.includes('doktor')) return 200;
     return 0;
   }
 
-  private validatePendidikanFormal(dto: PendidikanFormalData): void {
-    const required = ['jenjang', 'prodi', 'fakultas', 'perguruanTinggi', 'lulusTahun'];
-    const missing = required.filter(f => !dto[f]);
-    if (missing.length) throw new BadRequestException(`Data pendidikan formal tidak lengkap: ${missing.join(', ')}`);
-  }
+  async create(dosenId: number, rawData: any, file: Express.Multer.File) {
+    const schema = fullPendidikanSchema;
+    const parsed = schema.safeParse(rawData);
 
-  private validateDiklat(dto: DiklatData): void {
-    const required = [
-      'jenisDiklat', 'namaDiklat', 'penyelenggara', 'peran',
-      'tingkatan', 'jumlahJam', 'tglSertifikat', 'tanggalMulai', 'tanggalSelesai',
-    ];
-    const missing = required.filter(f => !dto[f]);
-    if (missing.length) throw new BadRequestException(`Data diklat tidak lengkap: ${missing.join(', ')}`);
-  }
+    if (!parsed.success) {
+      throw new BadRequestException(parsed.error.format());
+    }
 
-  private async deleteFile(fileName: string): Promise<void> {
-    if (!fileName) return;
+    const data = parsed.data;
+    const kategori = data.kategori;
 
-    const filePath = path.join(this.UPLOAD_PATH, fileName);
+    const dosen = await this.prisma.dosen.findUnique({
+      where: { id: dosenId },
+    });
+
+    if (!dosen) {
+      throw new BadRequestException('Dosen tidak ditemukan');
+    }
+
+    const savedFileName = this.fileUtil.generateFileName(file.originalname);
 
     try {
-      if (fs.existsSync(filePath)) {
-        await fs.promises.unlink(filePath);
+      await this.fileUtil.writeFile(file, savedFileName);
+
+      const nilaiPak = await this.getNilaiPak(data);
+
+      const pendidikan = await this.prisma.pendidikan.create({
+        data: {
+          dosenId,
+          kategori,
+          filePath: savedFileName,
+          nilaiPak,
+        },
+      });
+
+      if (kategori === 'FORMAL') {
+        await this.prisma.pendidikanFormal.create({
+          data: {
+            pendidikanId: pendidikan.id,
+            jenjang: data.jenjang,
+            prodi: data.prodi,
+            fakultas: data.fakultas,
+            perguruanTinggi: data.perguruanTinggi,
+            lulusTahun: data.lulusTahun,
+          },
+        });
+      } else if (kategori === 'DIKLAT') {
+        await this.prisma.pendidikanDiklat.create({
+          data: {
+            pendidikanId: pendidikan.id,
+            jenisDiklat: data.jenisDiklat,
+            namaDiklat: data.namaDiklat,
+            penyelenggara: data.penyelenggara,
+            peran: data.peran,
+            tingkatan: data.tingkatan,
+            jumlahJam: data.jumlahJam,
+            noSertifikat: data.noSertifikat,
+            tglSertifikat: data.tglSertifikat,
+            tempat: data.tempat,
+            tglMulai: data.tglMulai,
+            tglSelesai: data.tglSelesai,
+          },
+        });
       }
+
+      return {
+        success: true,
+        message: 'Data berhasil ditambahkan',
+        data: pendidikan,
+      };
     } catch (error) {
-      console.error('Failed to delete file:', error);
+      console.error('Error saat menyimpan pendidikan:', error);
+      await this.fileUtil.deleteFile(savedFileName);
+      throw new InternalServerErrorException('Gagal menyimpan pendidikan');
     }
   }
 
-  async create(dto: CreatePendidikanServiceDto) {
-    // validasi payload (non-file) -> otomatis jadi Date
-    const data = createPendidikanSchema.parse(dto);
+  async update(
+    id: number,
+    dosenId: number,
+    rawData: any,
+    file?: Express.Multer.File,
+    role?: TypeUserRole,
+  ) {
+    const schema = fullUpdatePendidikanSchema;
+    const parsed = schema.safeParse(rawData);
+    if (!parsed.success) {
+      throw new BadRequestException(parsed.error.format());
+    }
 
-    // validasi kategori
-    if (data.kategori === 'Pendidikan Formal')
-      this.validatePendidikanFormal(data);
-    if (data.kategori === 'Diklat')
-      this.validateDiklat(data);
+    const data = parsed.data;
 
-    const name = this.fileName(dto.file.originalname);
-
-    return this.prisma.$transaction(async tx => {
-      // 1) simpan file dulu
-      await this.write(dto.file, name);
-
-      // 2) insert ke DB
-      const record = await tx.pendidikan.create({
-        data: {
-          dosen: { connect: { id: data.dosenId } },
-          kategori: data.kategori,
-          kegiatan: data.kegiatan,
-          nilaiPak: this.getNilaiPak(data.kategori, data.jenjang),
-          file: name,
-          ...(data.kategori === 'Pendidikan Formal'
-            ? {
-              jenjang: data.jenjang,
-              prodi: data.prodi,
-              fakultas: data.fakultas,
-              perguruanTinggi: data.perguruanTinggi,
-              lulusTahun: data.lulusTahun,
-            }
-            : {
-              jenisDiklat: data.jenisDiklat,
-              namaDiklat: data.namaDiklat,
-              penyelenggara: data.penyelenggara,
-              peran: data.peran,
-              tingkatan: data.tingkatan,
-              jumlahJam: data.jumlahJam,
-              noSertifikat: data.noSertifikat,
-              tglSertifikat: data.tglSertifikat,
-              tempat: data.tempat,
-              tanggalMulai: data.tanggalMulai,
-              tanggalSelesai: data.tanggalSelesai,
-            }),
-        },
-        include: { dosen: { select: { id: true, nama: true } } },
-      });
-
-      return { success: true, message: 'Data pendidikan berhasil disimpan', data: record };
+    const existing = await this.prisma.pendidikan.findUnique({
+      where: { id },
+      include: { Formal: true, Diklat: true },
     });
-  }
 
-  // service
-  async update(id: number, dto: UpdatePendidikanServiceDto) {
-    const data = updatePendidikanSchema.parse(dto);
-    const record = await this.prisma.pendidikan.findUnique({ where: { id } });
-    if (!record) throw new NotFoundException();
+    if (!existing) throw new NotFoundException('Data pendidikan tidak ditemukan');
 
-    let newFileName: string | undefined;
+    if (role !== TypeUserRole.ADMIN && existing.dosenId !== dosenId) {
+      throw new ForbiddenException('Anda tidak berhak memperbarui data ini');
+    }
 
-    return this.prisma.$transaction(async tx => {
-      // 1. jika ada file baru → hapus lama, simpan baru
-      if (dto.file) {
-        newFileName = this.fileName(dto.file.originalname);
-        await this.write(dto.file, newFileName);
-        if (record.file) await this.deleteFile(record.file);
+    let filePath = existing.filePath;
+    if (file) {
+      await this.fileUtil.deleteFile(filePath);
+      filePath = this.fileUtil.generateFileName(file.originalname);
+      await this.fileUtil.writeFile(file, filePath);
+    }
+
+    const nilaiPak = this.getNilaiPak(data);
+
+    return this.prisma.$transaction(async (tx) => {
+      const baseUpdate: any = {
+        filePath,
+        nilaiPak,
+      };
+
+      if (data.kategori === 'FORMAL') {
+        const { jenjang, prodi, fakultas, perguruanTinggi, lulusTahun } = data;
+
+        await tx.pendidikan.update({
+          where: { id },
+          data: {
+            ...baseUpdate,
+            Formal: {
+              upsert: {
+                update: {
+                  ...(jenjang && { jenjang }),
+                  ...(prodi && { prodi }),
+                  ...(fakultas && { fakultas }),
+                  ...(perguruanTinggi && { perguruanTinggi }),
+                  ...(lulusTahun && { lulusTahun }),
+                },
+                create: {
+                  jenjang: jenjang!,
+                  prodi: prodi!,
+                  fakultas: fakultas!,
+                  perguruanTinggi: perguruanTinggi!,
+                  lulusTahun: lulusTahun!,
+                },
+              },
+            },
+            Diklat: { delete: true },
+          },
+        });
+      } else {
+        const {
+          jenisDiklat,
+          namaDiklat,
+          penyelenggara,
+          peran,
+          tingkatan,
+          jumlahJam,
+          noSertifikat,
+          tglSertifikat,
+          tempat,
+          tglMulai,
+          tglSelesai,
+        } = data;
+
+        await tx.pendidikan.update({
+          where: { id },
+          data: {
+            ...baseUpdate,
+            Diklat: {
+              upsert: {
+                update: {
+                  ...(jenisDiklat && { jenisDiklat }),
+                  ...(namaDiklat && { namaDiklat }),
+                  ...(penyelenggara && { penyelenggara }),
+                  ...(peran && { peran }),
+                  ...(tingkatan && { tingkatan }),
+                  ...(jumlahJam && { jumlahJam }),
+                  ...(noSertifikat && { noSertifikat }),
+                  ...(tglSertifikat && { tglSertifikat }),
+                  ...(tempat && { tempat }),
+                  ...(tglMulai && { tglMulai }),
+                  ...(tglSelesai && { tglSelesai }),
+                },
+                create: {
+                  jenisDiklat: jenisDiklat!,
+                  namaDiklat: namaDiklat!,
+                  penyelenggara: penyelenggara!,
+                  peran: peran!,
+                  tingkatan: tingkatan!,
+                  jumlahJam: jumlahJam!,
+                  noSertifikat: noSertifikat!,
+                  tglSertifikat: tglSertifikat!,
+                  tempat: tempat!,
+                  tglMulai: tglMulai!,
+                  tglSelesai: tglSelesai!,
+                },
+              },
+            },
+            Formal: { delete: true },
+          },
+        });
       }
 
-      const jenjang = data.jenjang ?? record.jenjang ?? undefined;
-
-      // 2. update DB
-      const updated = await tx.pendidikan.update({
-        where: { id },
-        data: {
-          ...data,
-          ...(newFileName && { file: newFileName }),
-          nilaiPak: this.getNilaiPak(data.kategori ?? record.kategori, jenjang),
-        },
-        include: { dosen: { select: { id: true, nama: true } } },
-      });
-
-      return { success: true, message: 'Data berhasil diperbarui', data: updated };
+      return { success: true, message: 'Pendidikan berhasil diperbarui' };
     });
   }
 
-
-  async findAll(query: FindAllQueryDto, userId: number, role: Role) {
-    const { search, sortBy, sortOrder, ...filters } = query;
-
+  async findAll(userId: number, role: TypeUserRole, query: any) {
     const page = Number(query.page) || 1;
     const limit = Number(query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    // Only allow specific filter keys
-    const allowedFilterKeys = ['kategori', 'jenjang', 'lulusTahun', 'tingkatan'];
-    const safeFilters = Object.entries(filters).filter(
-      ([key, value]) =>
-        allowedFilterKeys.includes(key) &&
-        value !== undefined &&
-        (typeof value !== 'string' || value.trim() !== '')
-    );
+    const where: any = {};
+    if (role !== TypeUserRole.ADMIN) {
+      where.dosenId = userId;
+    }
 
-    const where: Prisma.PendidikanWhereInput = {
-      ...(role === Role.DOSEN && { dosenId: userId }),
-      ...Object.fromEntries(safeFilters),
-      ...(search && {
-        OR: [
-          { kegiatan: { contains: search, mode: 'insensitive' } },
-          { prodi: { contains: search, mode: 'insensitive' } },
-          { namaDiklat: { contains: search, mode: 'insensitive' } },
-          { penyelenggara: { contains: search, mode: 'insensitive' } },
-        ],
-      }),
-    };
+    if (query.kategori) where.kategori = query.kategori;
+    if (query.jenjang) where.Formal = { jenjang: query.jenjang };
 
-    // ✨ Sorting dengan default & validasi
-    const allowedSortFields = [
-      'id', 'kategori', 'jenjang', 'prodi', 'lulusTahun',
-      'nilaiPak', 'createdAt', 'updatedAt',
-    ];
-    const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
-    const safeSortOrder = sortOrder === 'asc' ? 'asc' : 'desc';
-
-    const [rows, total] = await Promise.all([
+    const [data, total] = await this.prisma.$transaction([
       this.prisma.pendidikan.findMany({
         where,
-        orderBy: { [safeSortBy]: safeSortOrder },
         skip,
         take: limit,
+        orderBy: { createdAt: 'desc' },
         include: {
+          Formal: true,
+          Diklat: true,
           dosen: { select: { id: true, nama: true } },
         },
       }),
@@ -238,95 +269,43 @@ export class PendidikanService {
     return {
       success: true,
       meta: {
+        total,
         page,
         limit,
         totalPages: Math.ceil(total / limit),
-        total,
       },
-      data: rows,
+      data,
     };
   }
 
-  async findOne(id: number, userId: number, role: Role) {
-    const whereCondition: any = { id };
-
-    if (role === Role.DOSEN) {
-      whereCondition.dosenId = userId;
-    }
-
-    const item = await this.prisma.pendidikan.findFirst({
-      where: whereCondition,
+  async findOne(id: number, userId: number, role: TypeUserRole) {
+    const pendidikan = await this.prisma.pendidikan.findUnique({
+      where: { id },
       include: {
-        dosen: {
-          select: {
-            id: true,
-            nama: true,
-          }
-        }
-      }
+        Formal: true,
+        Diklat: true,
+        dosen: { select: { id: true, nama: true } },
+      },
     });
 
-    if (!item) throw new NotFoundException('Pendidikan not found');
-    return item;
+    if (!pendidikan) throw new NotFoundException('Data tidak ditemukan');
+    if (role !== TypeUserRole.ADMIN && pendidikan.dosenId !== userId) {
+      throw new ForbiddenException('Anda tidak berhak mengakses data ini');
+    }
+
+    return { success: true, data: pendidikan };
   }
 
-  async remove(id: number, userId: number, role: Role) {
+  async delete(id: number, userId: number, role: TypeUserRole) {
     const existing = await this.prisma.pendidikan.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Data tidak ditemukan');
-    if (role !== Role.ADMIN && existing.dosenId !== userId) {
+    if (role !== TypeUserRole.ADMIN && existing.dosenId !== userId) {
       throw new ForbiddenException('Tidak diizinkan menghapus data ini');
     }
 
-    try {
-      await this.prisma.pendidikan.delete({ where: { id } });
+    await this.prisma.pendidikan.delete({ where: { id } });
+    await this.fileUtil.deleteFile(existing.filePath);
 
-      // Delete file after successful database deletion
-      if (existing.file) {
-        await this.deleteFile(existing.file);
-      }
-
-      return {
-        success: true,
-        message: 'Data pendidikan berhasil dihapus'
-      };
-    } catch (error) {
-      if (error.code === 'P2025') {
-        throw new NotFoundException('Data tidak ditemukan');
-      }
-
-      console.error('Database error:', error);
-      throw new InternalServerErrorException('Gagal menghapus data pendidikan');
-    }
-  }
-
-  async streamFileById(
-    id: number,
-    userId: number,
-    role: Role,
-    asDownload = false,
-  ): Promise<{ file: StreamableFile; filename: string; disposition: string }> {
-    const data = await this.prisma.pendidikan.findUnique({ where: { id } });
-    if (!data) throw new NotFoundException('Data tidak ditemukan');
-
-    if (role !== Role.ADMIN && data.dosenId !== userId) {
-      throw new ForbiddenException('Anda tidak berhak mengakses file ini');
-    }
-
-    const filePath = path.join(this.UPLOAD_PATH, data.file);
-    if (!fs.existsSync(filePath)) {
-      throw new NotFoundException('File tidak ditemukan di sistem');
-    }
-
-    const stream = fs.createReadStream(filePath);
-    const filename = path.basename(filePath);
-    const disposition = asDownload
-      ? `attachment; filename="${filename}"`
-      : `inline; filename="${filename}"`;
-
-    return {
-      file: new StreamableFile(stream),
-      filename,
-      disposition,
-    };
+    return { success: true, message: 'Data berhasil dihapus' };
   }
 }

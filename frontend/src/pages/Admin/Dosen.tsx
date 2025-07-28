@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { type User } from '../../../../sidupak-backend/src/users/dto/user.dto';
+import { type User } from '../../../../backend/src/users/dto/user.dto';
 import * as userService from '../../services/user.service';
 import * as fakultasService from '../../services/fakultas.service';
 import * as prodiService from '../../services/prodi.service';
 
 import Button from '../../components/ui/Button';
 import { DosenFormModal } from '../../components/ui/DosenFormModal';
-import type { Fakultas } from '../../../../sidupak-backend/src/fakultas/dto/fakultas.dto';
-import type { Prodi } from '../../../../sidupak-backend/src/prodi/dto/prodi.dto';
+import type { Fakultas } from '../../../../backend/src/fakultas/dto/fakultas.dto';
+import type { Prodi } from '../../../../backend/src/prodi/dto/prodi.dto';
 
 export const AdminDosenPage = () => {
     const [dosenList, setDosenList] = useState<User[]>([]);

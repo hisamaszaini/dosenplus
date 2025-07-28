@@ -4,7 +4,7 @@ import { FakultasService } from './fakultas.service';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Roles } from 'src/auth/decorators/roles.decorator';
-import { Role } from '@prisma/client';
+import { TypeUserRole } from '@prisma/client';
 import { CreateFakultasDto, UpdateFakultasDto } from './dto/fakultas.dto';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -13,31 +13,31 @@ export class FakultasController {
   constructor(private readonly fakultasService: FakultasService) {}
 
   @Post()
-  @Roles(Role.ADMIN)
+  @Roles(TypeUserRole.ADMIN)
   create(@Body() createFakultasDto: CreateFakultasDto) {
     return this.fakultasService.create(createFakultasDto);
   }
 
   @Get()
-  @Roles(Role.ADMIN, Role.DOSEN, Role.VALIDATOR)
+  @Roles(TypeUserRole.ADMIN, TypeUserRole.DOSEN, TypeUserRole.VALIDATOR)
   findAll() {
     return this.fakultasService.findAll();
   }
 
   @Get(':id')
-  @Roles(Role.ADMIN, Role.DOSEN, Role.VALIDATOR)
+  @Roles(TypeUserRole.ADMIN, TypeUserRole.DOSEN, TypeUserRole.VALIDATOR)
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.fakultasService.findOne(id);
   }
 
   @Patch(':id')
-  @Roles(Role.ADMIN)
+  @Roles(TypeUserRole.ADMIN)
   update(@Param('id', ParseIntPipe) id: number, @Body() updateFakultasDto: UpdateFakultasDto) {
     return this.fakultasService.update(id, updateFakultasDto);
   }
 
   @Delete(':id')
-  @Roles(Role.ADMIN)
+  @Roles(TypeUserRole.ADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.fakultasService.remove(id);

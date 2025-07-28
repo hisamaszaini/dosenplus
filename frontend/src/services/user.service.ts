@@ -9,7 +9,7 @@ import type {
   UpdateValidatorProfileDto,
   UpdateDataKepegawaianDto,
   UpdateUserStatusDto,
-} from '../../../sidupak-backend/src/users/dto/user.dto';
+} from '../../../backend/src/users/dto/user.dto';
 
 // ==============================
 // ========== Tipe =============

@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
 import { CreateSemesterDto, UpdateSemesterDto } from './dto/semester.dto';
 
@@ -7,134 +7,169 @@ type StringOrInt = string | number;
 
 @Injectable()
 export class SemesterService {
-    constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
-    private generateKodeDanNama(tipe: string, tahunMulai: number, tahunSelesai: number) {
-        const kode = Number(`${tahunMulai}${tahunSelesai}${tipe === 'GENAP' ? 1 : 0}`);
-        const nama = `${tipe === 'GENAP' ? 'Genap' : 'Ganjil'} ${tahunMulai}/${tahunSelesai}`;
-        return { kode, nama };
+  private generateKodeDanNama(tipe: string, tahunMulai: number, tahunSelesai: number) {
+    const kode = Number(`${tahunMulai}${tahunSelesai}${tipe === 'GENAP' ? 1 : 0}`);
+    const nama = `${tipe === 'GENAP' ? 'Genap' : 'Ganjil'} ${tahunMulai}/${tahunSelesai}`;
+    return { kode, nama };
+  }
+
+  async create(createSemesterDto: CreateSemesterDto) {
+    const { tipe, tahunMulai, tahunSelesai, status } = createSemesterDto;
+    const { kode, nama } = this.generateKodeDanNama(tipe, tahunMulai, tahunSelesai);
+
+    const existing = await this.prisma.semester.findFirst({
+      where: {
+        OR: [{ kode }, { nama }],
+      },
+    });
+
+    if (existing) {
+      throw new BadRequestException('Semester dengan kode atau nama yang sama sudah ada');
     }
 
-    async create(createSemesterDto: CreateSemesterDto) {
-        const { tipe, tahunMulai, tahunSelesai, status } = createSemesterDto;
-        const { kode, nama } = this.generateKodeDanNama(tipe, tahunMulai, tahunSelesai);
+    const created = await this.prisma.semester.create({
+      data: {
+        kode,
+        nama,
+        tipe,
+        tahunMulai,
+        tahunSelesai,
+        status,
+      },
+    });
 
-        const existing = await this.prisma.semester.findFirst({
-            where: {
-                OR: [{ kode }, { nama }],
-            },
+    return {
+      success: true,
+      message: 'Semester berhasil dibuat',
+      data: created,
+    };
+  }
+
+  async findAll(query: { page?: number; limit?: number; search?: string }) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+    const search = query.search?.trim();
+
+    const searchConditions: Prisma.SemesterWhereInput[] = [];
+
+    if (search) {
+      searchConditions.push({
+        nama: {
+          contains: search,
+          mode: Prisma.QueryMode.insensitive,
+        },
+      });
+
+      if (search.toUpperCase() === 'GENAP' || search.toUpperCase() === 'GANJIL') {
+        searchConditions.push({
+          tipe: search.toUpperCase() as any,
         });
+      }
 
-        if (existing) {
-            throw new BadRequestException('Semester dengan kode atau nama yang sama sudah ada');
-        }
-
-        return this.prisma.semester.create({
-            data: {
-                kode,
-                nama,
-                tipe,
-                tahunMulai,
-                tahunSelesai,
-                status,
-            },
-        });
+      const year = parseInt(search);
+      if (!isNaN(year)) {
+        searchConditions.push({ tahunMulai: year });
+        searchConditions.push({ tahunSelesai: year });
+      }
     }
 
-    async findAll(query: { page?: number; limit?: number; search?: string }) {
-        const page = query.page ?? 1;
-        const limit = query.limit ?? 10;
-        const search = query.search?.trim();
+    const where: Prisma.SemesterWhereInput = searchConditions.length > 0
+      ? { OR: searchConditions }
+      : {};
 
-        const searchConditions: Prisma.SemesterWhereInput[] = [];
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.semester.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { tahunMulai: 'desc' },
+      }),
+      this.prisma.semester.count({ where }),
+    ]);
 
-        if (search) {
-            searchConditions.push({
-                nama: {
-                    contains: search,
-                    mode: Prisma.QueryMode.insensitive,
-                },
-            });
+    return {
+      success: true,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+      data,
+    };
+  }
 
-            if (search.toUpperCase() === 'GENAP' || search.toUpperCase() === 'GANJIL') {
-                searchConditions.push({
-                    tipe: search.toUpperCase() as any,
-                });
-            }
+  async findOne(id: number) {
+    const data = await this.prisma.semester.findUnique({ where: { id } });
+    if (!data) throw new NotFoundException('Semester tidak ditemukan');
 
-            const year = parseInt(search);
-            if (!isNaN(year)) {
-                searchConditions.push({ tahunMulai: year });
-                searchConditions.push({ tahunSelesai: year });
-            }
-        }
+    return {
+      success: true,
+      data,
+    };
+  }
 
-        const where: Prisma.SemesterWhereInput = searchConditions.length > 0
-            ? { OR: searchConditions }
-            : {};
+  async findByOne(param: string, value: StringOrInt) {
+    const data = await this.prisma.semester.findFirst({ where: { [param]: value } });
 
-        const [data, total] = await this.prisma.$transaction([
-            this.prisma.semester.findMany({
-                where,
-                skip: (page - 1) * limit,
-                take: limit,
-                orderBy: { tahunMulai: 'desc' },
-            }),
-            this.prisma.semester.count({ where }),
-        ]);
+    return {
+      success: true,
+      data,
+    };
+  }
 
-        return {
-            data,
-            meta: {
-                page,
-                limit,
-                total,
-                totalPages: Math.ceil(total / limit),
-            },
-        };
+  async findByMany(param: string, value: StringOrInt) {
+    const data = await this.prisma.semester.findMany({ where: { [param]: value } });
+
+    return {
+      success: true,
+      data,
+    };
+  }
+
+  async update(id: number, updateSemesterDto: UpdateSemesterDto) {
+    const { tipe, tahunMulai, tahunSelesai, status } = updateSemesterDto;
+    const { kode, nama } = this.generateKodeDanNama(tipe, tahunMulai, tahunSelesai);
+
+    const existing = await this.prisma.semester.findFirst({
+      where: {
+        OR: [{ kode }, { nama }],
+        NOT: { id },
+      },
+    });
+
+    if (existing) {
+      throw new BadRequestException('Semester dengan kode atau nama yang sama sudah ada');
     }
 
-    findOne(id: number) {
-        return this.prisma.semester.findUniqueOrThrow({ where: { id } });
-    }
+    const updated = await this.prisma.semester.update({
+      where: { id },
+      data: {
+        kode,
+        nama,
+        tipe,
+        tahunMulai,
+        tahunSelesai,
+        status,
+      },
+    });
 
-    findByOne(param: string, value: StringOrInt) {
-        return this.prisma.semester.findFirst({ where: { [param]: value } });
-    }
+    return {
+      success: true,
+      message: 'Semester berhasil diperbarui',
+      data: updated,
+    };
+  }
 
-    findByMany(param: string, value: StringOrInt) {
-        return this.prisma.semester.findMany({ where: { [param]: value } });
-    }
+  async remove(id: number) {
+    const deleted = await this.prisma.semester.delete({ where: { id } });
 
-    async update(id: number, updateSemesterDto: UpdateSemesterDto) {
-        const { tipe, tahunMulai, tahunSelesai, status } = updateSemesterDto;
-        const { kode, nama } = this.generateKodeDanNama(tipe, tahunMulai, tahunSelesai);
-
-        const existing = await this.prisma.semester.findFirst({
-            where: {
-                OR: [{ kode }, { nama }],
-                NOT: { id },
-            },
-        });
-
-        if (existing) {
-            throw new BadRequestException('Semester dengan kode atau nama yang sama sudah ada');
-        }
-
-        return this.prisma.semester.update({
-            where: { id },
-            data: {
-                kode,
-                nama,
-                tipe,
-                tahunMulai,
-                tahunSelesai,
-                status,
-            },
-        });
-    }
-
-    remove(id: number) {
-        return this.prisma.semester.delete({ where: { id } });
-    }
+    return {
+      success: true,
+      message: 'Semester berhasil dihapus',
+      data: deleted,
+    };
+  }
 }

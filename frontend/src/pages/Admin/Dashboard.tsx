@@ -1,4 +1,4 @@
-import React from 'react';
+import PageWrapper from "../../components/PageWrapper";
 
 const StatCard = ({ title, value, icon, iconBg }) => {
   return (
@@ -18,16 +18,17 @@ const StatCard = ({ title, value, icon, iconBg }) => {
 
 const AdminDashboardPage = () => {
   return (
-    <div className="space-y-6">
-      {/* <h1 className="text-2xl font-bold text-gray-800">Dashboard Administrator</h1> */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="Total Dosen" value="78" icon="fas fa-users" iconBg="from-sky-400 to-sky-500" />
-        <StatCard title="Dokumen Terverifikasi" value="1,204" icon="fas fa-check-double" iconBg="from-emerald-400 to-emerald-500" />
-        <StatCard title="Menunggu Validasi" value="56" icon="fas fa-hourglass-half" iconBg="from-amber-400 to-amber-500" />
-        <StatCard title="Total Penelitian" value="312" icon="fas fa-flask" iconBg="from-rose-400 to-rose-500" />
+    <PageWrapper title="Dashboard Administrator">
+      <div className="space-y-6">
+        {/* <h1 className="text-2xl font-bold text-gray-800">Dashboard Administrator</h1> */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <StatCard title="Total Dosen" value="78" icon="fas fa-users" iconBg="from-sky-400 to-sky-500" />
+          <StatCard title="Dokumen Terverifikasi" value="1,204" icon="fas fa-check-double" iconBg="from-emerald-400 to-emerald-500" />
+          <StatCard title="Menunggu Validasi" value="56" icon="fas fa-hourglass-half" iconBg="from-amber-400 to-amber-500" />
+          <StatCard title="Total Penelitian" value="312" icon="fas fa-flask" iconBg="from-rose-400 to-rose-500" />
+        </div>
       </div>
-      {/* Tambahkan komponen lain seperti tabel aktivitas terbaru di sini */}
-    </div>
+    </PageWrapper>
   );
 };
 

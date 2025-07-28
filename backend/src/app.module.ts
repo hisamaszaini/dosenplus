@@ -11,6 +11,8 @@ import { SemesterModule } from './semester/semester.module';
 import { ProdiModule } from './prodi/prodi.module';
 import { PendidikanModule } from './pendidikan/pendidikan.module';
 import { PelaksanaanPendidikanModule } from './pelaksanaan-pendidikan/pelaksanaan-pendidikan.module';
+import { HashAndEncryptService } from './utils/hashAndEncrypt';
+import { DataAndFileModule } from './utils/dataAndFile.module';
 
 @Module({
   imports: [
@@ -31,10 +33,13 @@ import { PelaksanaanPendidikanModule } from './pelaksanaan-pendidikan/pelaksanaa
 
     PendidikanModule,
 
-    PelaksanaanPendidikanModule
+    PelaksanaanPendidikanModule,
+
+    DataAndFileModule,
   ],
   controllers: [AppController],
   providers: [
-    AppService],
+    AppService, HashAndEncryptService],
+  exports: [HashAndEncryptService],
 })
 export class AppModule { }

@@ -4,11 +4,7 @@ import { AuthService } from './auth.service';
 import { CreateDosenUserDto, LoginDto } from 'src/users/dto/user.dto';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
-import { Public } from '@prisma/client/runtime/library';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { RolesGuard } from './guards/roles.guard';
-import { Roles } from './decorators/roles.decorator';
-import { Role } from '@prisma/client';
 
 @Controller('auth')
 export class AuthController {
@@ -20,18 +16,11 @@ export class AuthController {
     return this.authService.login(req.user);
   }
 
-  @Post('register/dosen')
-  @HttpCode(HttpStatus.CREATED)
-  registerDosen(@Body() dto: CreateDosenUserDto) {
-    return this.authService.registerDosen(dto);
-  }
-
-  // @UseGuards(JwtAuthGuard, RolesGuard)
-  // @Roles(Role.ADMIN)
-  // @Post('register/internal')
+  // Register sekarang melalui API User
+  // @Post('register/dosen')
   // @HttpCode(HttpStatus.CREATED)
-  // registerInternalUser(@Body() dto: CreateInternalUserDto) {
-  //   return this.authService.registerInternalUser(dto);
+  // registerDosen(@Body() dto: CreateDosenUserDto) {
+  //   return this.authService.registerDosen(dto);
   // }
 
   @Post('forgot-password')

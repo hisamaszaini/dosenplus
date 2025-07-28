@@ -1,10 +1,9 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, HttpCode, HttpStatus, UseInterceptors, UploadedFile, ParseFilePipe, MaxFileSizeValidator, FileTypeValidator, Req, ParseIntPipe, Query } from '@nestjs/common';
 import { PelaksanaanPendidikanService } from './pelaksanaan-pendidikan.service';
-import { UpdatePelaksanaanPendidikanDto } from './dto/update-pelaksanaan-pendidikan.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Roles } from 'src/auth/decorators/roles.decorator';
-import { Role } from '@prisma/client';
+import { TypeUserRole } from '@prisma/client';
 import { FileInterceptor } from '@nestjs/platform-express';
 
 @Controller('pelaksanaan-pendidikan')
@@ -13,7 +12,7 @@ export class PelaksanaanPendidikanController {
   constructor(private readonly pelaksanaanPendidikanService: PelaksanaanPendidikanService) { }
 
   @Post()
-  @Roles(Role.DOSEN)
+  @Roles(TypeUserRole.DOSEN)
   @HttpCode(HttpStatus.CREATED)
   @UseInterceptors(FileInterceptor('file'))
   async create(
@@ -33,12 +32,12 @@ export class PelaksanaanPendidikanController {
     const dosenId = req.user.sub;
     const kategori = body.kategori;
 
-    return this.pelaksanaanPendidikanService.create(kategori, dosenId, body, file);
+    return this.pelaksanaanPendidikanService.create(dosenId, body, file);
   }
 
 
   @Get()
-  @Roles(Role.DOSEN, Role.ADMIN, Role.VALIDATOR)
+  @Roles(TypeUserRole.DOSEN, TypeUserRole.ADMIN, TypeUserRole.VALIDATOR)
   async findAll(
     @Query() query: any,
     @Req() req: any,
@@ -51,7 +50,7 @@ export class PelaksanaanPendidikanController {
 
 
   @Get(':id')
-  @Roles(Role.ADMIN, Role.VALIDATOR, Role.DOSEN)
+  @Roles(TypeUserRole.ADMIN, TypeUserRole.VALIDATOR, TypeUserRole.DOSEN)
   async findOne(
     @Param('id', ParseIntPipe) id: number,
     @Req() req: any,
@@ -64,7 +63,7 @@ export class PelaksanaanPendidikanController {
 
 
   @Patch(':id')
-  @Roles(Role.DOSEN)
+  @Roles(TypeUserRole.DOSEN, TypeUserRole.ADMIN)
   @UseInterceptors(FileInterceptor('file'))
   async update(
     @Param('id', ParseIntPipe) id: number,
@@ -83,13 +82,13 @@ export class PelaksanaanPendidikanController {
     @Req() req: any,
   ) {
     const dosenId = req.user.sub;
-    const kategori = body.kategori;
+    const role = req.user.role;
 
-    // return this.pelaksanaanPendidikanService.update(id, kategori, dosenId, body, file);
+    return this.pelaksanaanPendidikanService.update(id, dosenId, body, file, role);
   }
 
   @Delete(':id')
-  @Roles(Role.DOSEN, Role.ADMIN)
+  @Roles(TypeUserRole.DOSEN, TypeUserRole.ADMIN)
   async delete(
     @Param('id', ParseIntPipe) id: number,
     @Req() req: any,

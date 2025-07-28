@@ -1,6 +1,6 @@
 import api from './api';
-import type { CreatePendidikanDto } from '../../../sidupak-backend/src/pendidikan/dto/create-pendidikan.dto';
-import type { UpdatePendidikanDto } from '../../../sidupak-backend/src/pendidikan/dto/update-pendidikan.dto';
+import type { CreatePendidikanDto } from '../../../backend/src/pendidikan/dto/create-pendidikan.dto';
+import type { UpdatePendidikanDto } from '../../../backend/src/pendidikan/dto/update-pendidikan.dto';
 
 // Types untuk response
 export interface PendidikanItem {

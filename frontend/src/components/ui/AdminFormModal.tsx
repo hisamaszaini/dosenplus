@@ -9,7 +9,7 @@ import {
   type CreateAdminUserDto,
   type UpdateAdminProfileDto,
   type User,
-} from '../../../../sidupak-backend/src/users/dto/user.dto';
+} from '../../../../backend/src/users/dto/user.dto';
 
 import * as userService from '../../services/user.service';
 import Button from './Button';

@@ -1,21 +1,28 @@
 import api from './api';
-import type { CreateFakultasDto, Fakultas, UpdateFakultasDto } from '../../../sidupak-backend/src/fakultas/dto/fakultas.dto';
+import type { CreateFakultasDto, Fakultas, UpdateFakultasDto } from '../../../backend/src/fakultas/dto/fakultas.dto';
 
-export const getAllFakultas = async (): Promise<Fakultas[]> => {
+type ApiResponse<T> = {
+  success: boolean;
+  message?: string;
+  data: T;
+};
+
+export const getAllFakultas = async (): Promise<ApiResponse<Fakultas[]>> => {
   const { data } = await api.get('/fakultas');
   return data;
 };
 
-export const createFakultas = async (fakultasData: CreateFakultasDto): Promise<Fakultas> => {
-  const { data } = await api.post('/fakultas', fakultasData);
+export const createFakultas = async (payload: CreateFakultasDto): Promise<ApiResponse<Fakultas>> => {
+  const { data } = await api.post('/fakultas', payload);
   return data;
 };
 
-export const updateFakultas = async (id: number, fakultasData: UpdateFakultasDto): Promise<Fakultas> => {
-  const { data } = await api.patch(`/fakultas/${id}`, fakultasData);
+export const updateFakultas = async (id: number, payload: UpdateFakultasDto): Promise<ApiResponse<Fakultas>> => {
+  const { data } = await api.patch(`/fakultas/${id}`, payload);
   return data;
 };
 
-export const deleteFakultas = async (id: number): Promise<void> => {
-  await api.delete(`/fakultas/${id}`);
+export const deleteFakultas = async (id: number): Promise<ApiResponse<null>> => {
+  const { data } = await api.delete(`/fakultas/${id}`);
+  return data;
 };

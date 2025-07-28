@@ -5,6 +5,7 @@ import AuthLayout from '../../components/layout/AuthLayout';
 import InputWithIcon from '../../components/ui/InputWithIcon';
 import type { CreateUserDto } from '../../types/user.types';
 import api from '../../services/api';
+import { Helmet } from 'react-helmet-async';
 
 function RegisterPage() {
   const navigate = useNavigate();
@@ -39,6 +40,9 @@ function RegisterPage() {
 
   return (
     <AuthLayout>
+      <Helmet>
+        <title>Daftar - DosenPlus</title>
+      </Helmet>
       <div className="w-full max-w-md bg-white rounded-xl shadow-2xl p-8 md:p-10 space-y-8">
         {/* Header */}
         <div>

@@ -4,11 +4,12 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import AuthLayout from '../../components/layout/AuthLayout';
 import InputWithIcon from '../../components/ui/InputWithIcon';
 import api from '../../services/api';
+import { Helmet } from 'react-helmet-async';
 
 function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  
+
   const token = searchParams.get('token');
 
   const [password, setPassword] = useState('');
@@ -31,12 +32,12 @@ function ResetPasswordPage() {
       setError('Password dan konfirmasi password tidak cocok.');
       return;
     }
-    
+
     setIsLoading(true);
     try {
       await api.post(`/auth/reset-password?token=${token}`, { password });
       setMessage('Password berhasil diubah! Anda akan diarahkan ke halaman login.');
-      
+
       setTimeout(() => {
         navigate('/login');
       }, 3000);
@@ -50,6 +51,9 @@ function ResetPasswordPage() {
 
   return (
     <AuthLayout>
+      <Helmet>
+        <title>Reset Password - DosenPlus</title>
+      </Helmet>
       <div className="w-full max-w-md bg-white rounded-xl shadow-2xl p-8 md:p-10 space-y-8">
         {/* Header */}
         <div>
@@ -91,7 +95,7 @@ function ResetPasswordPage() {
 
           {message && <p className="text-sm text-green-600 text-center">{message}</p>}
           {error && <p className="text-sm text-red-600 text-center">{error}</p>}
-          
+
           <div>
             <button
               type="submit"

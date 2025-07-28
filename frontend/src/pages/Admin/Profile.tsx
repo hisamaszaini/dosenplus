@@ -7,7 +7,7 @@ import Button from '../../components/ui/Button';
 import FormField from '../../components/ui/FormField';
 import { updateMyAdminProfile, changeMyPassword } from '../../services/user.service';
 import { useAuth } from '../../contexts/AuthContext';
-import { changePasswordSchema, updateAdminProfileSchema, type ChangePasswordDto, type UpdateAdminProfileDto } from '../../../../sidupak-backend/src/users/dto/user.dto';
+import { changePasswordSchema, updateAdminProfileSchema, type ChangePasswordDto, type UpdateAdminProfileDto } from '../../../../backend/src/users/dto/user.dto';
 
 const AdminProfilePage = () => {
   const { user } = useAuth();

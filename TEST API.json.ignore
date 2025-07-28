@@ -1,0 +1,54 @@
+TEST API
+
+LOGIN
+http://127.0.0.1:3000/auth/login
+
+{
+  "email": "admin@hisam.ac.id",
+  "password": "admin123"
+}
+
+
+PROFILE
+http://127.0.0.1:3000/users/profile
+
+BEARER TOKEN : eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjEsIm5hbWUiOiJBZG1pbiBTaXN0ZW0iLCJlbWFpbCI6ImFkbWluQGhpc2FtLmFjLmlkIiwidXNlcm5hbWUiOiJhZG1pbiIsInJvbGVzIjpbIkFETUlOIl0sImlhdCI6MTc1MzY2MTU2NCwiZXhwIjoxNzUzNjYyNDY0fQ.hihZpimietOnkAY9_pEHIv4vzovfWFfNCmUrYPxWG28
+
+{
+    "success": true,
+    "data": {
+        "id": 1,
+        "email": "admin@hisam.ac.id",
+        "username": "admin",
+        "name": "Admin Sistem",
+        "status": "ACTIVE",
+        "passwordResetToken": null,
+        "passwordResetExpires": null,
+        "createdAt": "2025-07-28T00:08:01.075Z",
+        "updatedAt": "2025-07-28T00:12:44.691Z",
+        "userRoles": [
+            {
+                "id": 1,
+                "userId": 1,
+                "roleId": 1,
+                "role": {
+                    "id": 1,
+                    "name": "ADMIN"
+                }
+            }
+        ],
+        "dosen": null,
+        "validator": null
+    }
+}
+
+REFRESH TOKEN:
+http://127.0.0.1:3000/auth/refresh
+
+Bearer Token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjEsIm5hbWUiOiJBZG1pbiBTaXN0ZW0iLCJlbWFpbCI6ImFkbWluQGhpc2FtLmFjLmlkIiwidXNlcm5hbWUiOiJhZG1pbiIsInJvbGVzIjpbIkFETUlOIl0sImlhdCI6MTc1MzY2MTU2NCwiZXhwIjoxNzU0MjY2MzY0fQ.edcl0bDP0EjzgUOntZfTlRx2gj9pYu0IF6v9DreseFk
+
+Response
+{
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjEsIm5hbWUiOiJBZG1pbiBTaXN0ZW0iLCJlbWFpbCI6ImFkbWluQGhpc2FtLmFjLmlkIiwidXNlcm5hbWUiOiJhZG1pbiIsInJvbGVzIjpbIkFETUlOIl0sImlhdCI6MTc1MzY2MjAwMSwiZXhwIjoxNzUzNjYyOTAxfQ.1yQQoG0PXqwEPNL9fwTTdKvzueDLSY0gIj7B-s9TcYs",
+    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjEsIm5hbWUiOiJBZG1pbiBTaXN0ZW0iLCJlbWFpbCI6ImFkbWluQGhpc2FtLmFjLmlkIiwidXNlcm5hbWUiOiJhZG1pbiIsInJvbGVzIjpbIkFETUlOIl0sImlhdCI6MTc1MzY2MjAwMSwiZXhwIjoxNzU0MjY2ODAxfQ.fD2bv2PgdbQE5lxciROZe5ZnLOhSgm-ZSs01nUY8ruM"
+}

@@ -2,8 +2,12 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
-import { type Prodi, createProdiSchema, type CreateProdiDto } from '../../../../sidupak-backend/src/prodi/dto/prodi.dto';
-import { type Fakultas } from '../../../../sidupak-backend/src/fakultas/dto/fakultas.dto';
+import {
+  type Prodi,
+  createProdiSchema,
+  type CreateProdiDto,
+} from '../../../../backend/src/prodi/dto/prodi.dto';
+import { type Fakultas } from '../../../../backend/src/fakultas/dto/fakultas.dto';
 import { createProdi, updateProdi } from '../../services/prodi.service';
 
 import Button from './Button';
@@ -41,12 +45,15 @@ const ProdiFormModal = ({ isOpen, onClose, onSuccess, initialData, fakultas }: P
   const [apiError, setApiError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (initialData) {
-      reset({ kode: initialData.kode, nama: initialData.nama, fakultasId: initialData.fakultasId });
-    } else {
-      reset({ kode: '', nama: '', fakultasId: undefined });
+    if (isOpen) {
+      reset({
+        kode: initialData?.kode ?? '',
+        nama: initialData?.nama ?? '',
+        fakultasId: initialData?.fakultasId ?? undefined,
+      });
+      setApiError(null);
     }
-  }, [initialData, reset]);
+  }, [isOpen, initialData, reset]);
 
   const onSubmit = async (data: CreateProdiDto) => {
     setApiError(null);
@@ -58,7 +65,7 @@ const ProdiFormModal = ({ isOpen, onClose, onSuccess, initialData, fakultas }: P
       }
       onSuccess();
     } catch (err: any) {
-      setApiError(err.response?.data?.message || 'Terjadi kesalahan');
+      setApiError(err.response?.data?.message || 'Terjadi kesalahan saat menyimpan data.');
     }
   };
 
@@ -77,8 +84,8 @@ const ProdiFormModal = ({ isOpen, onClose, onSuccess, initialData, fakultas }: P
             <input
               type="text"
               {...register('kode')}
-              className="w-full md:flex-1 px-4 py-3 rounded-xl bg-white/80 border border-gray-300 focus:border-accent focus:ring-2 focus:ring-accent/30 hover:border-accent outline-none transition-all duration-300 text-gray-700 placeholder-gray-400 shadow-sm"
-              placeholder="Contoh: IF"
+              className="w-full px-4 py-3 rounded-xl border bg-white/80 border-gray-300 focus:border-accent focus:ring-2 focus:ring-accent/30 outline-none transition-all duration-300 text-gray-700 shadow-sm"
+              placeholder="Contoh: TI"
             />
             {errors.kode && <p className="text-red-500 text-sm mt-1">{errors.kode.message}</p>}
           </FormField>
@@ -87,25 +94,28 @@ const ProdiFormModal = ({ isOpen, onClose, onSuccess, initialData, fakultas }: P
             <input
               type="text"
               {...register('nama')}
-              className="w-full md:flex-1 px-4 py-3 rounded-xl bg-white/80 border border-gray-300 focus:border-accent focus:ring-2 focus:ring-accent/30 hover:border-accent outline-none transition-all duration-300 text-gray-700 placeholder-gray-400 shadow-sm"
+              className="w-full px-4 py-3 rounded-xl border bg-white/80 border-gray-300 focus:border-accent focus:ring-2 focus:ring-accent/30 outline-none transition-all duration-300 text-gray-700 shadow-sm"
               placeholder="Contoh: Teknik Informatika"
             />
             {errors.nama && <p className="text-red-500 text-sm mt-1">{errors.nama.message}</p>}
           </FormField>
-          
+
           <FormField label="Fakultas">
             <select
               {...register('fakultasId', { valueAsNumber: true })}
-              className="w-full md:flex-1 px-4 py-3 rounded-xl bg-white/80 border border-gray-300 focus:border-accent focus:ring-2 focus:ring-accent/30 hover:border-accent outline-none transition-all duration-300 text-gray-700 placeholder-gray-400 shadow-sm"
+              className="w-full px-4 py-3 rounded-xl border bg-white/80 border-gray-300 focus:border-accent focus:ring-2 focus:ring-accent/30 outline-none transition-all duration-300 text-gray-700 shadow-sm"
+              disabled={fakultas.length === 0}
             >
               <option value="">-- Pilih Fakultas --</option>
-              {fakultas.map(f => (
+              {fakultas.map((f) => (
                 <option key={f.id} value={f.id}>
                   {f.nama}
                 </option>
               ))}
             </select>
-            {errors.fakultasId && <p className="text-red-500 text-sm mt-1">{errors.fakultasId.message}</p>}
+            {errors.fakultasId && (
+              <p className="text-red-500 text-sm mt-1">{errors.fakultasId.message}</p>
+            )}
           </FormField>
 
           {apiError && <p className="text-red-500 text-sm text-center">{apiError}</p>}

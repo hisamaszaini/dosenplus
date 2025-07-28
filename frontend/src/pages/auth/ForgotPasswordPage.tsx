@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import AuthLayout from '../../components/layout/AuthLayout';
 import InputWithIcon from '../../components/ui/InputWithIcon';
 import api from '../../services/api';
+import { Helmet } from 'react-helmet-async';
 
 function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -29,6 +30,9 @@ function ForgotPasswordPage() {
 
   return (
     <AuthLayout>
+      <Helmet>
+        <title>Lupa Password - DosenPlus</title>
+      </Helmet>
       <div className="w-full max-w-md bg-white rounded-xl shadow-2xl p-8 md:p-10 space-y-8">
         {/* Header */}
         <div>
@@ -59,7 +63,7 @@ function ForgotPasswordPage() {
 
           {message && <p className="text-sm text-green-600 text-center">{message}</p>}
           {error && <p className="text-sm text-red-600 text-center">{error}</p>}
-          
+
           <div>
             <button
               type="submit"

@@ -8,6 +8,7 @@ import { CreateDosenUserDto } from 'src/users/dto/user.dto';
 import { MailService } from 'src/mail/mail.service';
 import { randomBytes } from 'crypto';
 import { UsersService } from 'src/users/users.service';
+import { success } from 'zod';
 
 @Injectable()
 export class AuthService {
@@ -24,14 +25,13 @@ export class AuthService {
         return this.login(newUser);
     }
 
-    // async registerInternalUser(dto: CreateInternalUserDto) {
-    //     const newUser = await this.usersService.createInternalUser(dto);
-    //     return newUser;
-    // }
-
-    // --- VALIDASI PENGGUNA SAAT LOGIN ---
+    // Validasi Login
     async validateUser(email: string, pass: string) {
-        const user = await this.prisma.user.findUnique({ where: { email } });
+        const user = await this.prisma.user.findUnique({
+            where: { email },
+            include: { userRoles: { include: { role: true } } },
+        });
+
         if (!user) {
             throw new UnauthorizedException('Kredensial tidak valid.');
         }
@@ -44,23 +44,28 @@ export class AuthService {
         return user;
     }
 
-    // --- LOGIN DAN BUAT TOKENS ---
+    // Login
     async login(user: any) {
+        const roles = user.userRoles.map(userRole => userRole.role.name);
+
         const payload = {
             sub: user.id,
             name: user.name,
             email: user.email,
             username: user.username,
-            role: user.role,
+            roles,
         };
 
         const [accessToken, refreshToken] = await this.getTokens(payload);
         await this.updateRefreshTokenHash(user.id, refreshToken);
 
-        return { accessToken, refreshToken };
+        return { 
+            success: true,
+            message: 'Login berhasil!',
+            accessToken, refreshToken };
     }
 
-    // --- LOGOUT ---
+    // Logout
     async logout(userId: number) {
         await this.prisma.user.updateMany({
             where: {
@@ -75,15 +80,17 @@ export class AuthService {
         });
     }
 
-    // --- REFRESH TOKEN ---
+    // Refresh Token
     async refreshTokens(userId: number, rt: string) {
-        const user = await this.prisma.user.findUnique({ where: { id: userId } });
+        const user = await this.prisma.user.findUnique({
+            where: { id: userId },
+            include: { userRoles: { include: { role: true } } },
+        });
 
         if (!user || !user.hashedRefreshToken) {
             throw new ForbiddenException('Akses Ditolak');
         }
 
-        // const rtMatches = await bcrypt.compare(rt, user.hashedRefreshToken);
         const hashedRt = await this.hashToken(rt);
         const rtMatches = hashedRt === user.hashedRefreshToken;
 
@@ -92,16 +99,29 @@ export class AuthService {
 
         if (!rtMatches) throw new ForbiddenException('Akses Ditolak');
 
-        const payload = { sub: user.id, name: user.name, email: user.email, username: user.username, role: user.role };
+        const roles = user.userRoles.map(userRole => userRole.role.name);
+
+        const payload = {
+            sub: user.id,
+            name: user.name,
+            email: user.email,
+            username: user.username,
+            roles,
+        };
+
         const [accessToken, refreshToken] = await this.getTokens(payload);
         await this.updateRefreshTokenHash(user.id, refreshToken);
         console.log(`[REFRESH] Token diperbarui untuk user ${user.email}`);
         console.log(`[REFRESH] Token baru user ${user.email}: ${accessToken}`);
 
-        return { accessToken, refreshToken };
+        return {
+            success: true,
+            mesaage: 'Refresh token berhasil',
+            accessToken, refreshToken
+        };
     }
 
-    // --- Lupa Password ---
+    // Lupa Password
     async forgotPassword(email: string) {
         const user = await this.prisma.user.findUnique({ where: { email } });
         if (!user) {
@@ -127,7 +147,7 @@ export class AuthService {
 
         try {
             await this.mailService.sendPasswordResetEmail(user.email, resetToken);
-            return { message: 'Link reset password telah dikirim ke email Anda.' };
+            return { success: true, message: 'Link reset password telah dikirim ke email Anda.' };
         } catch (error) {
             await this.prisma.user.update({
                 where: { email },
@@ -142,7 +162,7 @@ export class AuthService {
         }
     }
 
-    // --- Reset Password ---
+    // Reset Password
     async resetPassword(token: string, newPass: string) {
         const hashedToken = await this.hashToken(token);
 
@@ -168,7 +188,10 @@ export class AuthService {
             },
         });
 
-        return { message: 'Password berhasil direset.' };
+        return {
+            success: true,
+            message: 'Password berhasil direset.'
+        };
     }
 
     // --- FUNGSI BANTUAN ---
@@ -188,7 +211,7 @@ export class AuthService {
         });
     }
 
-    private async getTokens(payload: { sub: number; email: string; username: string; role: string; }) {
+    private async getTokens(payload: { sub: number; email: string; username: string; roles: string[]; }) {
         const accessToken = await this.jwtService.signAsync(payload, {
             secret: this.configService.get<string>('JWT_SECRET'),
             expiresIn: this.configService.get<string>('JWT_ACCESS_TOKEN_EXPIRATION_TIME'),

@@ -6,7 +6,6 @@ import {
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from 'prisma/prisma.service';
-import { Prisma, Role } from '@prisma/client';
 
 import type {
     ChangePasswordDto,
@@ -20,36 +19,23 @@ import type {
     UpdateValidatorProfileDto,
     UpdateAdminProfileDto,
 } from './dto/user.dto';
-import { onErrorResumeNextWith } from 'rxjs';
 
 const SALT_ROUNDS = 10;
-
-export interface PaginatedResult<T> {
-    data: T[];
-    meta: {
-        page: number;
-        limit: number;
-        total: number;
-        totalPages: number;
-        hasNext: boolean;
-        hasPrev: boolean;
-    };
-}
 
 @Injectable()
 export class UsersService {
     constructor(private prisma: PrismaService) { }
 
-    /**
-     * Create Dosen User dengan biodata wajib
-     * Memastikan tidak ada user DOSEN tanpa data dosen
-     */
     async createDosenWithUserAccount(dto: CreateDosenUserDto) {
         await this.validateUniqueUser(dto.dataUser.email, dto.dataUser.username);
-
         await this.validateFakultasProdi(dto.biodata.fakultasId, dto.biodata.prodiId);
 
         const hashedPassword = await bcrypt.hash(dto.dataUser.password, SALT_ROUNDS);
+
+        const role = await this.prisma.role.findUnique({ where: { name: 'DOSEN' } });
+        if (!role) {
+            throw new BadRequestException('Role DOSEN tidak ditemukan.');
+        }
 
         return this.prisma.$transaction(async (tx) => {
             const newUser = await tx.user.create({
@@ -58,7 +44,14 @@ export class UsersService {
                     username: dto.dataUser.username,
                     name: dto.biodata.nama,
                     password: hashedPassword,
-                    role: 'DOSEN',
+                    status: 'ACTIVE',
+                },
+            });
+
+            await tx.userRole.create({
+                data: {
+                    userId: newUser.id,
+                    roleId: role.id,
                 },
             });
 
@@ -79,40 +72,24 @@ export class UsersService {
             }
 
             const { password, hashedRefreshToken, ...userData } = newUser;
-            return userData;
+
+            return {
+                success: true,
+                message: 'Dosen berhasil ditambahkan',
+                userData
+            };
         });
     }
 
-    /**
-     * Create Admin
-     */
     async createAdminUser(dto: CreateAdminUserDto) {
         await this.validateUniqueUser(dto.dataUser.email, dto.dataUser.username);
 
         const hashedPassword = await bcrypt.hash(dto.dataUser.password, SALT_ROUNDS);
 
-        const newUser = await this.prisma.user.create({
-            data: {
-                email: dto.dataUser.email,
-                username: dto.dataUser.username,
-                name: dto.dataUser.name,
-                password: hashedPassword,
-                role: 'ADMIN',
-            },
-        });
-
-        const { password, hashedRefreshToken, ...userData } = newUser;
-        return userData;
-    }
-
-    /**
-     * Create Validator
-     * Untuk VALIDATOR akan membuat data Validator otomatis
-     */
-    async createValidatorUser(dto: CreateValidatorUserDto) {
-        await this.validateUniqueUser(dto.dataUser.email, dto.dataUser.username);
-
-        const hashedPassword = await bcrypt.hash(dto.dataUser.password, SALT_ROUNDS);
+        const role = await this.prisma.role.findUnique({ where: { name: 'ADMIN' } });
+        if (!role) {
+            throw new BadRequestException('Role ADMIN tidak ditemukan.');
+        }
 
         return this.prisma.$transaction(async (tx) => {
             const newUser = await tx.user.create({
@@ -121,7 +98,51 @@ export class UsersService {
                     username: dto.dataUser.username,
                     name: dto.dataUser.name,
                     password: hashedPassword,
-                    role: 'VALIDATOR',
+                    status: 'ACTIVE',
+                },
+            });
+
+            await tx.userRole.create({
+                data: {
+                    userId: newUser.id,
+                    roleId: role.id,
+                },
+            });
+
+            const { password, hashedRefreshToken, ...userData } = newUser;
+            return {
+                success: true,
+                message: 'Admin berhasil ditambahkan',
+                userData
+            };
+        });
+    }
+
+    async createValidatorUser(dto: CreateValidatorUserDto) {
+        await this.validateUniqueUser(dto.dataUser.email, dto.dataUser.username);
+
+        const hashedPassword = await bcrypt.hash(dto.dataUser.password, SALT_ROUNDS);
+
+        const role = await this.prisma.role.findUnique({ where: { name: 'VALIDATOR' } });
+        if (!role) {
+            throw new BadRequestException('Role VALIDATOR tidak ditemukan.');
+        }
+
+        return this.prisma.$transaction(async (tx) => {
+            const newUser = await tx.user.create({
+                data: {
+                    email: dto.dataUser.email,
+                    username: dto.dataUser.username,
+                    name: dto.dataUser.name,
+                    password: hashedPassword,
+                    status: 'ACTIVE',
+                },
+            });
+
+            await tx.userRole.create({
+                data: {
+                    userId: newUser.id,
+                    roleId: role.id,
                 },
             });
 
@@ -133,13 +154,14 @@ export class UsersService {
             });
 
             const { password, hashedRefreshToken, ...userData } = newUser;
-            return userData;
+            return {
+                success: true,
+                message: 'Validator berhasil ditambahkan',
+                userData
+            };
         });
     }
 
-    /**
-     * Validasi unique email dan username
-     */
     private async validateUniqueUser(email: string, username: string) {
         const existingUser = await this.prisma.user.findFirst({
             where: {
@@ -160,9 +182,6 @@ export class UsersService {
         }
     }
 
-    /**
-     * Validasi fakultas dan prodi exists dan sesuai
-     */
     private async validateFakultasProdi(fakultasId: number, prodiId: number) {
         const fakultas = await this.prisma.fakultas.findUnique({
             where: { id: fakultasId },
@@ -174,7 +193,7 @@ export class UsersService {
         const prodi = await this.prisma.prodi.findUnique({
             where: {
                 id: prodiId,
-                fakultasId: fakultasId // pastikan prodi berada di fakultas yang benar
+                fakultasId: fakultasId
             },
         });
         if (!prodi) {
@@ -182,99 +201,82 @@ export class UsersService {
         }
     }
 
-    /**
-     * Find all users dengan informasi role-specific, pagination, dan search
-     */
-    async findAll(dto: FindAllUsersDto): Promise<PaginatedResult<any>> {
+    async findAll(dto: FindAllUsersDto): Promise<any> {
         const {
             page,
             limit,
             search,
-            role,
+            roles,
             status,
         } = dto;
 
         const skip = (page - 1) * limit;
 
-        // Build where clause untuk search dan filter
         const whereClause: any = {};
 
-        // Filter berdasarkan role jika ada
-        if (role) {
-            whereClause.role = role;
+        if (roles && roles.length > 0) {
+            whereClause.userRoles = {
+                some: {
+                    role: {
+                        name: {
+                            in: roles,
+                        },
+                    },
+                },
+            };
         }
 
-        // Filter berdasarkan status jika ada
         if (status) {
             whereClause.status = status;
         }
 
-        // Search berdasarkan name, email, atau username
         if (search) {
             whereClause.OR = [
                 { name: { contains: search, mode: 'insensitive' } },
                 { email: { contains: search, mode: 'insensitive' } },
                 { username: { contains: search, mode: 'insensitive' } },
-                // Search berdasarkan NIP dosen
                 {
                     dosen: {
-                        nip: { contains: search, mode: 'insensitive' }
-                    }
+                        nip: { contains: search, mode: 'insensitive' },
+                    },
                 },
-                // Search berdasarkan NIP validator
                 {
                     validator: {
-                        nip: { contains: search, mode: 'insensitive' }
-                    }
+                        nip: { contains: search, mode: 'insensitive' },
+                    },
                 },
             ];
         }
 
-        // Get total count untuk pagination
         const total = await this.prisma.user.count({
             where: whereClause,
         });
 
-        // Get paginated data
         const users = await this.prisma.user.findMany({
             where: whereClause,
             skip,
             take: limit,
-            select: {
-                id: true,
-                email: true,
-                username: true,
-                name: true,
-                role: true,
-                status: true,
-                createdAt: true,
+            include: {
+                userRoles: {
+                    include: {
+                        role: true,
+                    },
+                },
                 dosen: {
-                    select: {
-                        id: true,
-                        nip: true,
-                        nuptk: true,
-                        jenis_kelamin: true,
-                        no_hp: true,
-                        jabatan: true,
-                        fakultas: { select: { id: true, nama: true } },
-                        prodi: { select: { id: true, nama: true } }
+                    include: {
+                        dataKepegawaian: true,
+                        fakultas: true,
+                        prodi: true,
+                        pendidikan: true,
                     },
                 },
-                validator: {
-                    select: {
-                        id: true,
-                        nip: true,
-                        jenis_kelamin: true,
-                        no_hp: true,
-                    },
-                },
+                validator: true,
             },
             orderBy: {
                 createdAt: 'desc',
             },
         });
 
-        // Calculate pagination meta
         const totalPages = Math.ceil(total / limit);
         const hasNext = page < totalPages;
         const hasPrev = page > 1;
@@ -292,13 +294,15 @@ export class UsersService {
         };
     }
 
-    /**
-     * Find user by ID dengan data lengkap sesuai role
-     */
     async findById(id: number) {
         const user = await this.prisma.user.findUnique({
             where: { id },
             include: {
+                userRoles: {
+                    include: {
+                        role: true,
+                    },
+                },
                 dosen: {
                     include: {
                         dataKepegawaian: true,
@@ -316,12 +320,9 @@ export class UsersService {
         }
 
         const { password, hashedRefreshToken, ...result } = user;
-        return result;
+        return { success: true, data: result };
     }
 
-    /**
-     * Update profile validator
-     */
     async updateValidatorProfile(id: number, dto: UpdateValidatorProfileDto, byAdmin = false) {
         const user = await this.prisma.user.findUnique({ where: { id: id } });
         if (!user) throw new NotFoundException('User tidak ditemukan.');
@@ -357,12 +358,10 @@ export class UsersService {
             data: dto.biodata,
         });
 
-        return this.findById(id);
+        const userData = await this.findById(id);
+        return { success: true, message: 'Data berhasil diupdate.', data: userData };
     }
 
-    /**
-     * Update profile admin
-     */
     async updateAdminProfile(id: number, dto: UpdateAdminProfileDto) {
         const user = await this.prisma.user.findUnique({ where: { id: id } });
         if (!user) throw new NotFoundException('User tidak ditemukan.');
@@ -384,12 +383,10 @@ export class UsersService {
             },
         });
 
-        return this.findById(id);
+        const userData = await this.findById(id);
+        return { success: true, message: 'Data berhasil diupdate.', data: userData };
     }
 
-    /**
-     * Update profile dosen
-     */
     async updateDosenProfile(id: number, dto: UpdateDosenProfileDto, byAdmin = false) {
         const user = await this.prisma.user.findUnique({ where: { id: id } });
         if (!user) throw new NotFoundException('User tidak ditemukan.');
@@ -445,7 +442,8 @@ export class UsersService {
             });
         }
 
-        return this.findById(id);
+        const userData = await this.findById(id);
+        return { success: true, message: 'Data berhasil diupdate.', data: userData };
     }
 
     async updateDataKepegawaian(id: number, data: UpdateDataKepegawaianDto) {
@@ -464,10 +462,6 @@ export class UsersService {
         });
     }
 
-    /**
-     * Method untuk memastikan konsistensi data
-     * Buat data dosen/validator yang hilang (TIDAK ADA DEFAULT VALUES)
-     */
     async fixMissingRelationalData() {
         const results = {
             dosenMissing: 0,
@@ -475,20 +469,30 @@ export class UsersService {
             message: 'Data relational yang hilang harus diperbaiki manual karena tidak ada nilai default.',
         };
 
-        // Hitung missing dosen data
         const dosenUsers = await this.prisma.user.findMany({
             where: {
-                role: 'DOSEN',
-                dosen: null
+                userRoles: {
+                    some: {
+                        role: {
+                            name: 'DOSEN',
+                        },
+                    },
+                },
+                dosen: null,
             },
         });
         results.dosenMissing = dosenUsers.length;
 
-        // Hitung missing validator data
         const validatorUsers = await this.prisma.user.findMany({
             where: {
-                role: 'VALIDATOR',
-                validator: null
+                userRoles: {
+                    some: {
+                        role: {
+                            name: 'VALIDATOR',
+                        },
+                    },
+                },
+                validator: null,
             },
         });
         results.validatorMissing = validatorUsers.length;
@@ -509,7 +513,7 @@ export class UsersService {
             data: { password: newHashedPassword },
         });
 
-        return { message: 'Password berhasil diubah.' };
+        return { success: true, message: 'Password berhasil diubah.' };
     }
 
     async updateUserStatus(userIdToUpdate: number, dto: UpdateUserStatusDto) {
@@ -536,12 +540,11 @@ export class UsersService {
             throw new NotFoundException('User tidak ditemukan.');
         }
 
-        return this.prisma.user.delete({ where: { id } });
+        await this.prisma.user.delete({ where: { id } });
+
+        return { success: true, message: 'User berhasil dihapus!' };
     }
 
-    /**
-     * Search users berdasarkan berbagai kriteria
-     */
     async searchUsers(query: string, limit: number = 10) {
         return this.prisma.user.findMany({
             where: {
@@ -568,13 +571,12 @@ export class UsersService {
                 ],
             },
             take: limit,
-            select: {
-                id: true,
-                name: true,
-                email: true,
-                username: true,
-                role: true,
-                status: true,
+            include: {
+                userRoles: {
+                    include: {
+                        role: true,
+                    },
+                },
                 dosen: {
                     select: {
                         nip: true,

@@ -1,15 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { usePageTitle } from '../../contexts/PageTitleContext';
+import { type Role, extractRoles } from '../../types/user.types';
 
 interface HeaderProps {
   toggleSidebar: () => void;
 }
 
 const Header = ({ toggleSidebar }: HeaderProps) => {
-  const { user, logout } = useAuth();
+  const { user, activeRole, setActiveRole, logout } = useAuth();
+  const { title } = usePageTitle();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -19,30 +23,43 @@ const Header = ({ toggleSidebar }: HeaderProps) => {
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [dropdownRef]);
+  }, []);
 
   const getInitials = (name: string) => {
-    return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+    return name
+      .split(' ')
+      .map((n) => n[0])
+      .join('')
+      .substring(0, 2)
+      .toUpperCase();
   };
 
-  const formatRole = (role: string) => {
-    return role.charAt(0).toUpperCase() + role.slice(1).toLowerCase();
-  }
+  const formatRole = (role?: Role | null) =>
+    role ? role.charAt(0).toUpperCase() + role.slice(1).toLowerCase() : '';
+
+  const roles: Role[] = user ? extractRoles(user) : [];
+
+  const handleRoleChange = (newRole: Role) => {
+    if (newRole === activeRole) return;
+    setActiveRole(newRole);
+    setDropdownOpen(false);
+    navigate(`/${newRole.toLowerCase()}/dashboard`);
+  };
 
   return (
     <header className="bg-white shadow-md border-b border-gray-200 sticky top-0 z-20">
       <div className="px-4 lg:px-6 py-3 flex items-center justify-between">
-        {/* Tombol Hamburger untuk Mobile */}
+        {/* Tombol Hamburger */}
         <button
           onClick={toggleSidebar}
-          className="p-2 rounded-md text-gray-600 hover:text-primary lg:hidden"
+          className="p-2 rounded-md text-gray-600 hover:text-primary lg:hidden cursor-pointer"
         >
           <i className="fas fa-bars text-xl"></i>
         </button>
 
-        {/* Judul Halaman (Bisa dibuat dinamis nanti) */}
+        {/* Judul Halaman */}
         <div className="hidden lg:block">
-          <h1 className="text-xl font-semibold text-gray-800">Dashboard</h1>
+          <h1 className="text-xl font-semibold text-gray-800">{title || 'Memuat...'}</h1>
         </div>
 
         {/* Dropdown Profil */}
@@ -56,25 +73,57 @@ const Header = ({ toggleSidebar }: HeaderProps) => {
             </div>
             <div className="hidden sm:block text-left">
               <p className="text-sm font-medium text-gray-900">{user?.name}</p>
-              <p className="text-xs text-gray-500">{user ? formatRole(user.role) : ''}</p>
+              <p className="text-xs text-gray-500">{formatRole(activeRole)}</p>
             </div>
-            <i className={`hidden sm:block fas fa-chevron-down text-xs text-gray-400 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`}></i>
+            <i
+              className={`hidden sm:block fas fa-chevron-down text-xs text-gray-400 transition-transform ${
+                dropdownOpen ? 'rotate-180' : ''
+              }`}
+            ></i>
           </button>
 
           {/* Menu Dropdown */}
           {dropdownOpen && (
-            <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-md border border-gray-200 py-1 z-50">
+            <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-md border border-gray-200 py-1 z-50">
               <div className="px-4 py-3">
                 <p className="text-sm font-semibold text-gray-800">{user?.name}</p>
                 <p className="text-xs text-gray-500 truncate">{user?.email}</p>
               </div>
+
               <Link
-                to={`/${user?.role?.toLowerCase()}/profile`}
+                to={`/${activeRole?.toLowerCase()}/profile`}
                 className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
               >
                 <i className="fas fa-user-circle w-5 text-center text-gray-400"></i>
                 <span>Profil Saya</span>
               </Link>
+
+              {/* Role Switcher */}
+              {roles.length > 1 && (
+                <>
+                  <hr className="my-1 border-gray-200" />
+                  <div className="px-4 py-2">
+                    <p className="text-xs text-gray-500 mb-1">Ganti Peran</p>
+                    <ul className="space-y-1">
+                      {roles.map((role) => (
+                        <li key={role}>
+                          <button
+                            onClick={() => handleRoleChange(role)}
+                            className={`w-full text-left text-sm px-2 py-1 rounded-md ${
+                              role === activeRole
+                                ? 'bg-primary text-white font-semibold'
+                                : 'text-gray-700 hover:bg-gray-100'
+                            }`}
+                          >
+                            {formatRole(role)}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </>
+              )}
+
               <hr className="my-1 border-gray-200" />
               <button
                 onClick={logout}

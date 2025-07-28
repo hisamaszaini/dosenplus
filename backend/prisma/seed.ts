@@ -1,30 +1,60 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, TypeUserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const password = 'admin123'; // bisa dari ENV untuk keamanan
+  // Hash password
+  const password = 'admin123';
   const hashedPassword = await bcrypt.hash(password, 10);
 
-  // Cek apakah admin sudah ada
+  // Get all values from the TypeUserRole enum
+  const roles: TypeUserRole[] = Object.values(TypeUserRole);
+
+  // Create roles if they don't exist
+  for (const roleName of roles) {
+    const existingRole = await prisma.role.findUnique({
+      where: { name: roleName },
+    });
+
+    if (!existingRole) {
+      await prisma.role.create({
+        data: { name: roleName },
+      });
+    }
+  }
+
+  // Create admin user if they don't exist
   const existingAdmin = await prisma.user.findFirst({
-    where: { role: 'ADMIN' },
+    where: { email: 'admin@hisam.ac.id' },
   });
 
   if (!existingAdmin) {
-    await prisma.user.create({
+    const adminUser = await prisma.user.create({
       data: {
         email: 'admin@hisam.ac.id',
         username: 'admin',
         name: 'Admin Sistem',
         password: hashedPassword,
-        role: 'ADMIN',
         status: 'ACTIVE',
       },
     });
 
-    console.log('✅ Admin user created!');
+    // Assign ADMIN role to the admin user
+    const adminRole = await prisma.role.findUnique({
+      where: { name: TypeUserRole.ADMIN },
+    });
+
+    if (adminRole) {
+      await prisma.userRole.create({
+        data: {
+          userId: adminUser.id,
+          roleId: adminRole.id,
+        },
+      });
+    }
+
+    console.log('✅ Admin user created and assigned ADMIN role!');
   } else {
     console.log('ℹ️ Admin already exists, skipped seeding.');
   }

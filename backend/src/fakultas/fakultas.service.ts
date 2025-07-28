@@ -1,70 +1,113 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
 import { CreateFakultasDto, UpdateFakultasDto } from './dto/fakultas.dto';
 
 @Injectable()
 export class FakultasService {
-    constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) {}
 
-    async create(createFakultasDto: CreateFakultasDto) {
-        const existingKode = await this.prisma.fakultas.findUnique({
-            where: { kode: createFakultasDto.kode },
-        });
+  async create(createFakultasDto: CreateFakultasDto) {
+    const { kode, nama } = createFakultasDto;
 
-        if (existingKode) {
-            throw new BadRequestException('Kode fakultas sudah digunakan');
-        }
+    const existing = await this.prisma.fakultas.findFirst({
+      where: {
+        OR: [{ kode }, { nama }],
+      },
+    });
 
-        const existingNama = await this.prisma.fakultas.findFirst({
-            where: { nama: createFakultasDto.nama },
-        });
-
-        if (existingNama) {
-            throw new BadRequestException('Nama fakultas sudah digunakan');
-        }
-
-        return this.prisma.fakultas.create({ data: createFakultasDto });
+    if (existing) {
+      if (existing.kode === kode) {
+        throw new BadRequestException('Kode fakultas sudah digunakan');
+      }
+      if (existing.nama === nama) {
+        throw new BadRequestException('Nama fakultas sudah digunakan');
+      }
     }
 
-    findAll() {
-        return this.prisma.fakultas.findMany();
+    const created = await this.prisma.fakultas.create({
+      data: createFakultasDto,
+    });
+
+    return {
+      success: true,
+      message: 'Fakultas berhasil dibuat',
+      data: created,
+    };
+  }
+
+  async findAll() {
+    const data = await this.prisma.fakultas.findMany();
+
+    return {
+      success: true,
+      data,
+    };
+  }
+
+  async findOne(id: number) {
+    const data = await this.prisma.fakultas.findUnique({ where: { id } });
+
+    if (!data) {
+      throw new NotFoundException('Fakultas tidak ditemukan');
     }
 
-    findOne(id: number) {
-        return this.prisma.fakultas.findUniqueOrThrow({ where: { id } });
+    return {
+      success: true,
+      data,
+    };
+  }
+
+  async update(id: number, updateFakultasDto: UpdateFakultasDto) {
+    const { kode, nama } = updateFakultasDto;
+
+    if (kode) {
+      const existingKode = await this.prisma.fakultas.findUnique({
+        where: { kode },
+      });
+
+      if (existingKode && existingKode.id !== id) {
+        throw new BadRequestException('Kode fakultas sudah digunakan oleh data lain');
+      }
     }
 
-    async update(id: number, updateFakultasDto: UpdateFakultasDto) {
-        if (updateFakultasDto.kode) {
-            const existingKode = await this.prisma.fakultas.findUnique({
-                where: { kode: updateFakultasDto.kode },
-            });
+    if (nama) {
+      const existingNama = await this.prisma.fakultas.findFirst({
+        where: {
+          nama,
+          NOT: { id },
+        },
+      });
 
-            if (existingKode && existingKode.id !== id) {
-                throw new BadRequestException('Kode fakultas sudah digunakan oleh data lain');
-            }
-        }
-
-        if (updateFakultasDto.nama) {
-            const existingNama = await this.prisma.fakultas.findFirst({
-                where: {
-                    nama: updateFakultasDto.nama,
-                    NOT: { id },
-                },
-            });
-
-            if (existingNama) {
-                throw new BadRequestException('Nama fakultas sudah digunakan oleh data lain');
-            }
-        }
-
-        return this.prisma.fakultas.update({
-            where: { id },
-            data: updateFakultasDto,
-        });
+      if (existingNama) {
+        throw new BadRequestException('Nama fakultas sudah digunakan oleh data lain');
+      }
     }
 
-    remove(id: number) {
-        return this.prisma.fakultas.delete({ where: { id } });
+    const updated = await this.prisma.fakultas.update({
+      where: { id },
+      data: updateFakultasDto,
+    });
+
+    return {
+      success: true,
+      message: 'Fakultas berhasil diperbarui',
+      data: updated,
+    };
+  }
+
+  async remove(id: number) {
+    const existing = await this.prisma.fakultas.findUnique({ where: { id } });
+
+    if (!existing) {
+      throw new NotFoundException('Fakultas tidak ditemukan');
     }
+
+    const deleted = await this.prisma.fakultas.delete({ where: { id } });
+
+    return {
+      success: true,
+      message: 'Fakultas berhasil dihapus',
+      data: deleted,
+    };
+  }
 }
